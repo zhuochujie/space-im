@@ -397,6 +397,40 @@ services:
     networks:
       - openim
 
+  chat-server:
+    build:
+      context: ../chat-server
+    image: ${SPACE_CHAT_SERVER_IMAGE:-space-im-chat-server:latest}
+    container_name: chat-server
+    init: true
+    ports:
+      - "${SPACE_CHAT_SERVER_PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DATABASE=chat_server
+      - MONGO_USERNAME=chatService
+      - MONGO_PASSWORD=chatService123
+      - MONGO_AUTH_SOURCE=chat_server
+      - OPENIM_API_URL=http://openim-server:10002
+      - OPENIM_SECRET=${OPENIM_SECRET}
+      - OPENIM_ADMIN_USER_ID=imAdmin
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: always
+    depends_on:
+      - mongo
+      - openim-server
+    networks:
+      - openim
+
   # openim-chat:
   #   image: ${OPENIM_CHAT_IMAGE}
   #   container_name: openim-chat
