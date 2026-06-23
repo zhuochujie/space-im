@@ -1,0 +1,68 @@
+@baseUrl = http://localhost:3000
+@username = alice
+@password = password123
+@platformID = 5
+
+### 健康检查
+GET {{baseUrl}}
+Accept: application/json
+
+### 注册用户
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### 登录并获取 OpenIM Token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}",
+  "platformID": {{platformID}}
+}
+
+### 通过用户名精确搜索 userID
+GET {{baseUrl}}/auth/users/by-username?username={{username}}
+Accept: application/json
+
+### 注册重复用户名，预期返回 409
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### 密码错误，预期返回 401
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "incorrect-password",
+  "platformID": {{platformID}}
+}
+
+### 登录缺少平台 ID，预期返回 400
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "password": "{{password}}"
+}
+
+### 参数错误，预期返回 400
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "a",
+  "password": "short"
+}
