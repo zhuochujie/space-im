@@ -53,6 +53,7 @@ function AppContent() {
   const [profile, setProfile] = useState<SelfUserInfo>();
   const [connection, setConnection] = useState('未连接');
   const [nicknameDraft, setNicknameDraft] = useState('');
+  const [nicknameSetupRequired, setNicknameSetupRequired] = useState(false);
   const sessionRef = useRef<AuthSession | undefined>(undefined);
   const initialized = useRef(false);
   const loginPromise = useRef<Promise<void> | undefined>(undefined);
@@ -272,6 +273,8 @@ function AppContent() {
       );
       await loginWithSession(session);
       await saveSession(session);
+      setNicknameSetupRequired(true);
+      setNicknameDraft('');
     } catch {
       setConnection('连接失败');
       showToast('注册失败');
@@ -296,6 +299,7 @@ function AppContent() {
       await clearSession();
       setLoggedIn(false);
       setProfile(undefined);
+      setNicknameSetupRequired(false);
       sessionRef.current = undefined;
       setConnection('未连接');
       setBusy(false);
@@ -367,6 +371,7 @@ function AppContent() {
           ? { ...current, nickname: nextNickname, faceURL: faceURL || '' }
           : current),
       );
+      setNicknameSetupRequired(false);
       showToast('资料已修改');
       return true;
     } catch {
@@ -389,7 +394,10 @@ function AppContent() {
     return <LoginScreen busy={busy} onLogin={login} onRegister={register} />;
   }
 
-  const nicknameRequired = loggedIn && Boolean(profile) && !profile?.nickname?.trim();
+  const nicknameRequired =
+    loggedIn &&
+    Boolean(profile) &&
+    (nicknameSetupRequired || !profile?.nickname?.trim());
 
   return (
     <>

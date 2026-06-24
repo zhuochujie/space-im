@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -63,9 +64,12 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
     >
       <View style={styles.content}>
         <View style={styles.brandMark}>
-          <Text style={styles.brandMarkText}>IM</Text>
+          <Image
+            source={require('../assets/app-icon.png')}
+            style={styles.brandLogo}
+          />
         </View>
-        <Text style={styles.title}>OpenIM</Text>
+        <Text style={styles.title}>SPACE IM</Text>
         <Text style={styles.subtitle}>连接你的私有即时通讯服务</Text>
 
         <View style={styles.card}>
@@ -144,7 +148,7 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
           </Pressable>
         </View>
         <Text style={styles.hint}>
-          账号由认证服务管理，登录后会自动获取 OpenIM 凭证。
+          私有部署，安全可控，让团队沟通更轻盈。
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -164,15 +168,16 @@ const styles = StyleSheet.create({
   },
   brandMark: {
     alignSelf: 'center',
-    width: 58,
-    height: 58,
+    width: 76,
+    height: 76,
     borderRadius: 18,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  brandMarkText: { color: '#FFFFFF', fontWeight: '800', fontSize: 20 },
+  brandLogo: {
+    width: '100%',
+    height: '100%',
+  },
   title: {
     color: colors.text,
     fontSize: 30,

@@ -33,7 +33,7 @@ export class AuthService {
     const userID = await this.reserveUser(username, passwordHash);
 
     try {
-      await this.openImService.registerUser(userID, nickname ?? '');
+      await this.openImService.registerUser(userID, nickname ?? username);
       await this.usersRepository.activate(userID);
     } catch (error) {
       await this.usersRepository.deletePending(userID);

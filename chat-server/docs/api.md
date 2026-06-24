@@ -87,7 +87,8 @@ Content-Type: application/json
 ```
 
 `platformID` 不需要在注册时传入。注册成功后，服务会在 MongoDB 保存 Argon2id
-密码哈希，并把用户同步注册到 OpenIM。
+密码哈希，并把用户同步注册到 OpenIM。由于 OpenIM 注册用户时昵称不能为空，
+未传昵称时会先使用 `username` 作为临时昵称，客户端登录后会引导用户设置正式昵称。
 
 请求示例：
 

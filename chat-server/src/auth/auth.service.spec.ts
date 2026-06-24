@@ -87,7 +87,7 @@ describe('AuthService', () => {
 
     expect(result.username).toBe('alice');
     expect(result.userID).toMatch(/^\d{10}$/);
-    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, '');
+    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, 'alice');
     const storedUser = repository.reserve.mock.calls[0][0];
     expect(storedUser.userID).toBe(result.userID);
     expect(storedUser.username).toBe('alice');
