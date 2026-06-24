@@ -26,7 +26,11 @@ services:
         print(\"Password: $$MONGO_OPENIM_PASSWORD\");
         print(\"Database: $$MONGO_INITDB_DATABASE\");
       } else {
-        print(\"User already exists in database: $$MONGO_INITDB_DATABASE, Username: $$MONGO_OPENIM_USERNAME\");
+        db.updateUser(\"$$MONGO_OPENIM_USERNAME\", {
+          pwd: \"$$MONGO_OPENIM_PASSWORD\",
+          roles: [{role: \"readWrite\", db: \"$$MONGO_INITDB_DATABASE\"}]
+        });
+        print(\"User updated in database: $$MONGO_INITDB_DATABASE, Username: $$MONGO_OPENIM_USERNAME\");
       }
       db = db.getSiblingDB(\"$$MONGO_CHAT_DATABASE\");
       if (!db.getUser(\"$$MONGO_CHAT_USERNAME\")) {
@@ -39,7 +43,11 @@ services:
         print(\"Username: $$MONGO_CHAT_USERNAME\");
         print(\"Database: $$MONGO_CHAT_DATABASE\");
       } else {
-        print(\"Chat service user already exists in database: $$MONGO_CHAT_DATABASE, Username: $$MONGO_CHAT_USERNAME\");
+        db.updateUser(\"$$MONGO_CHAT_USERNAME\", {
+          pwd: \"$$MONGO_CHAT_PASSWORD\",
+          roles: [{role: \"readWrite\", db: \"$$MONGO_CHAT_DATABASE\"}]
+        });
+        print(\"Chat service user updated in database: $$MONGO_CHAT_DATABASE, Username: $$MONGO_CHAT_USERNAME\");
       }
       " &&
       tail -f /dev/null
