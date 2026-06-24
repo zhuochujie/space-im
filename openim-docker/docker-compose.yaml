@@ -58,9 +58,9 @@ services:
       - MONGO_INITDB_DATABASE=openim_v3
       - MONGO_OPENIM_USERNAME=${MONGO_USERNAME}
       - MONGO_OPENIM_PASSWORD=${MONGO_PASSWORD}
-      - MONGO_CHAT_DATABASE=chat_server
-      - MONGO_CHAT_USERNAME=chatService
-      - MONGO_CHAT_PASSWORD=chatService123
+      - MONGO_CHAT_DATABASE=${SPACE_CHAT_MONGODB_DATABASE:-chat_server}
+      - MONGO_CHAT_USERNAME=${SPACE_CHAT_MONGO_USERNAME:-chatService}
+      - MONGO_CHAT_PASSWORD=${SPACE_CHAT_MONGO_PASSWORD:-chatService123}
     restart: always
     networks:
       - openim
@@ -408,13 +408,13 @@ services:
     environment:
       - PORT=3000
       - MONGODB_URI=mongodb://mongo:27017
-      - MONGODB_DATABASE=chat_server
-      - MONGO_USERNAME=chatService
-      - MONGO_PASSWORD=chatService123
-      - MONGO_AUTH_SOURCE=chat_server
-      - OPENIM_API_URL=http://openim-server:10002
+      - MONGODB_DATABASE=${SPACE_CHAT_MONGODB_DATABASE:-chat_server}
+      - MONGO_USERNAME=${SPACE_CHAT_MONGO_USERNAME:-chatService}
+      - MONGO_PASSWORD=${SPACE_CHAT_MONGO_PASSWORD:-chatService123}
+      - MONGO_AUTH_SOURCE=${SPACE_CHAT_MONGO_AUTH_SOURCE:-chat_server}
+      - OPENIM_API_URL=${SPACE_CHAT_OPENIM_API_URL:-http://openim-server:10002}
       - OPENIM_SECRET=${OPENIM_SECRET}
-      - OPENIM_ADMIN_USER_ID=imAdmin
+      - OPENIM_ADMIN_USER_ID=${SPACE_CHAT_OPENIM_ADMIN_USER_ID:-imAdmin}
     healthcheck:
       test:
         [

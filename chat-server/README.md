@@ -13,7 +13,7 @@ token。
 | 环境变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `PORT` | HTTP 服务端口 | `3000` |
-| `MONGODB_URI` | MongoDB 连接地址 | `mongodb://127.0.0.1:37017` |
+| `MONGODB_URI` | MongoDB 连接地址 | `mongodb://mongo:27017` |
 | `MONGODB_DATABASE` | MongoDB 数据库名称 | `chat_server` |
 | `MONGO_USERNAME` | MongoDB 用户名 | 可选 |
 | `MONGO_PASSWORD` | MongoDB 密码 | 可选 |
@@ -23,7 +23,19 @@ token。
 | `OPENIM_ADMIN_USER_ID` | OpenIM 管理员用户 ID | `imAdmin` |
 
 项目启动时会自动读取根目录的 `.env` 文件。Docker Compose 或部署平台也可以直接
-注入这些环境变量，系统环境变量的优先级高于 `.env`。
+注入这些环境变量，系统环境变量的优先级高于 `.env`。在 Docker Compose 中使用
+`mongo`、`openim-server` 这类容器服务名；如果在宿主机本地开发运行，再改成
+`127.0.0.1` 和映射端口。
+
+使用 `openim-docker/docker-compose.yaml` 部署时，不需要单独复制
+`chat-server/.env.example`。请复制并编辑 `openim-docker/.env.example`：
+
+```bash
+cd openim-docker
+cp .env.example .env
+```
+
+Compose 会把 `SPACE_CHAT_*` 配置注入到 `chat-server` 容器。
 
 ## 启动
 
