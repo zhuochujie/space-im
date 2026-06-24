@@ -1,5 +1,3 @@
-import { ToastAndroid, Platform } from 'react-native';
-
 type ToastListener = (message: string) => void;
 
 type ConfirmOptions = {
@@ -45,9 +43,6 @@ export const dismissConfirm = (id?: string) => {
 
 export const showToast = (title: string, message?: string) => {
   const text = toastText(title, message);
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(text, ToastAndroid.SHORT);
-  }
   toastListener?.(text);
 };
 
