@@ -1,6 +1,6 @@
 export interface AuthUser {
   userID: string;
-  username: string;
+  phoneNumber: string;
 }
 
 export interface LoginResponse extends AuthUser {

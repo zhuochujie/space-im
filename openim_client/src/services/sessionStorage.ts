@@ -6,7 +6,7 @@ const SESSION_KEY = '@openim/client-session';
 
 type LegacySession = {
   userID?: string;
-  username?: string;
+  phoneNumber?: string;
   token?: string;
   imToken?: string;
   expireTimeSeconds?: number;
@@ -31,7 +31,7 @@ export async function loadSession(): Promise<AuthSession | undefined> {
     }
     return {
       userID: raw.userID,
-      username: raw.username || raw.userID,
+      phoneNumber: raw.phoneNumber || raw.userID,
       token,
       expireTimeSeconds: raw.expireTimeSeconds ?? 0,
     };

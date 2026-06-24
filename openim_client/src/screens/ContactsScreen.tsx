@@ -32,7 +32,7 @@ type Props = {
   onOpenFriend: (friend: FriendUserItem) => void;
   onOpenGroup: (group: GroupItem) => void;
   onRefresh: () => void;
-  onAddFriend: (username: string, message: string) => Promise<boolean>;
+  onAddFriend: (phoneNumber: string, message: string) => Promise<boolean>;
   onJoinGroup: (groupID: string, message: string) => Promise<boolean>;
   onCreateGroup: (name: string, memberUserIDs: string[]) => Promise<boolean>;
   onDeleteFriend: (friend: FriendUserItem) => Promise<boolean>;
@@ -330,7 +330,7 @@ export function ContactsScreen({
                   autoCorrect={false}
                   onChangeText={setTargetID}
                   placeholder={
-                    action === 'friend' ? '请输入用户名' : '请输入群号'
+                    action === 'friend' ? '请输入手机号' : '请输入群号'
                   }
                   placeholderTextColor="#A4ADBC"
                   style={styles.input}

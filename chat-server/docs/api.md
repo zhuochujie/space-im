@@ -35,9 +35,9 @@ http://localhost:3000
 | HTTP 状态码 | 场景 |
 | --- | --- |
 | `400` | 参数校验失败 |
-| `401` | 用户名或密码错误 |
+| `401` | 手机号或密码错误 |
 | `404` | 用户不存在 |
-| `409` | 用户名已存在 |
+| `409` | 手机号已注册 |
 | `502` | OpenIM 请求失败或响应异常 |
 | `503` | OpenIM 或服务配置缺失 |
 | `500` | 服务内部错误 |
@@ -46,8 +46,8 @@ http://localhost:3000
 
 | 字段 | 规则 |
 | --- | --- |
-| `username` | 必填，字符串，长度 3-32，只能包含字母、数字、下划线、点和短横线 |
-| `password` | 必填，字符串，长度 8-128 |
+| `phoneNumber` | 必填，字符串，手机号格式，示例：13800138000 |
+| `password` | 必填，字符串，长度 6-128 |
 | `platformID` | 登录必填，整数，大于 0。Web 通常为 `5` |
 
 ## 健康检查
@@ -81,21 +81,21 @@ Content-Type: application/json
 
 ```json
 {
-  "username": "alice",
+  "phoneNumber": "13800138000",
   "password": "password123"
 }
 ```
 
 `platformID` 不需要在注册时传入。注册成功后，服务会在 MongoDB 保存 Argon2id
 密码哈希，并把用户同步注册到 OpenIM。由于 OpenIM 注册用户时昵称不能为空，
-未传昵称时会先使用 `username` 作为临时昵称，客户端登录后会引导用户设置正式昵称。
+未传昵称时会先使用手机号作为临时昵称，客户端登录后会引导用户设置正式昵称。
 
 请求示例：
 
 ```bash
 curl -X POST http://localhost:3000/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123"}'
+  -d '{"phoneNumber":"13800138000","password":"password123"}'
 ```
 
 成功响应：
@@ -106,7 +106,7 @@ curl -X POST http://localhost:3000/auth/register \
   "message": "success",
   "data": {
     "userID": "1234567890",
-    "username": "alice"
+    "phoneNumber": "13800138000"
   },
   "timestamp": 1760000000000,
   "path": "/auth/register"
@@ -118,7 +118,7 @@ curl -X POST http://localhost:3000/auth/register \
 ```json
 {
   "code": 409,
-  "message": "用户名已存在",
+  "message": "手机号已注册",
   "data": null,
   "timestamp": 1760000000000,
   "path": "/auth/register"
@@ -136,7 +136,7 @@ Content-Type: application/json
 
 ```json
 {
-  "username": "alice",
+  "phoneNumber": "13800138000",
   "password": "password123",
   "platformID": 5
 }
@@ -149,7 +149,7 @@ Content-Type: application/json
 ```bash
 curl -X POST http://localhost:3000/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"password123","platformID":5}'
+  -d '{"phoneNumber":"13800138000","password":"password123","platformID":5}'
 ```
 
 成功响应：
@@ -160,7 +160,7 @@ curl -X POST http://localhost:3000/auth/login \
   "message": "success",
   "data": {
     "userID": "1234567890",
-    "username": "alice",
+    "phoneNumber": "13800138000",
     "token": "OpenIM user token",
     "expireTimeSeconds": 7776000
   },
@@ -174,7 +174,7 @@ curl -X POST http://localhost:3000/auth/login \
 ```json
 {
   "code": 401,
-  "message": "用户名或密码错误",
+  "message": "手机号或密码错误",
   "data": null,
   "timestamp": 1760000000000,
   "path": "/auth/login"
@@ -193,18 +193,18 @@ curl -X POST http://localhost:3000/auth/login \
 }
 ```
 
-## 通过用户名查询 userID
+## 通过手机号查询 userID
 
 ```http
-GET /auth/users/by-username?username=alice
+GET /auth/users/by-phone-number?phoneNumber=13800138000
 ```
 
-该接口按用户名精确匹配，只查询已注册成功的 active 用户。
+该接口按手机号精确匹配，只查询已注册成功的 active 用户。
 
 请求示例：
 
 ```bash
-curl 'http://localhost:3000/auth/users/by-username?username=alice'
+curl 'http://localhost:3000/auth/users/by-phone-number?phoneNumber=13800138000'
 ```
 
 成功响应：
@@ -215,10 +215,10 @@ curl 'http://localhost:3000/auth/users/by-username?username=alice'
   "message": "success",
   "data": {
     "userID": "1234567890",
-    "username": "alice"
+    "phoneNumber": "13800138000"
   },
   "timestamp": 1760000000000,
-  "path": "/auth/users/by-username?username=alice"
+  "path": "/auth/users/by-phone-number?phoneNumber=13800138000"
 }
 ```
 
@@ -230,6 +230,6 @@ curl 'http://localhost:3000/auth/users/by-username?username=alice'
   "message": "用户不存在",
   "data": null,
   "timestamp": 1760000000000,
-  "path": "/auth/users/by-username?username=alice"
+  "path": "/auth/users/by-phone-number?phoneNumber=13800138000"
 }
 ```

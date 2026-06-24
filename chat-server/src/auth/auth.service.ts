@@ -28,23 +28,23 @@ export class AuthService {
   ) {}
 
   async register(request: RegisterDto): Promise<AuthUser> {
-    const { username, password, nickname } = request;
+    const { phoneNumber, password, nickname } = request;
     const passwordHash = await this.hashPassword(password);
-    const userID = await this.reserveUser(username, passwordHash);
+    const userID = await this.reserveUser(phoneNumber, passwordHash);
 
     try {
-      await this.openImService.registerUser(userID, nickname ?? username);
+      await this.openImService.registerUser(userID, nickname ?? phoneNumber);
       await this.usersRepository.activate(userID);
     } catch (error) {
       await this.usersRepository.deletePending(userID);
       throw error;
     }
 
-    return { userID, username };
+    return { userID, phoneNumber };
   }
 
   private async reserveUser(
-    username: string,
+    phoneNumber: string,
     passwordHash: string,
   ): Promise<string> {
     for (
@@ -56,7 +56,7 @@ export class AuthService {
       try {
         await this.usersRepository.reserve({
           userID,
-          username,
+          phoneNumber,
           passwordHash,
         });
         return userID;
@@ -76,11 +76,11 @@ export class AuthService {
   }
 
   async login(request: LoginDto): Promise<LoginResponse> {
-    const { username, password, platformID } = request;
-    const user = await this.usersRepository.findByUsername(username);
+    const { phoneNumber, password, platformID } = request;
+    const user = await this.usersRepository.findByPhoneNumber(phoneNumber);
 
     if (!user || !(await this.verifyPassword(password, user.passwordHash))) {
-      throw new UnauthorizedException('用户名或密码错误');
+      throw new UnauthorizedException('手机号或密码错误');
     }
 
     const tokenResult = await this.openImService.getUserToken(
@@ -89,25 +89,25 @@ export class AuthService {
     );
     return {
       userID: user.userID,
-      username: user.username,
+      phoneNumber: user.phoneNumber,
       ...tokenResult,
     };
   }
 
-  async findUserIDByUsername(username: string): Promise<AuthUser> {
-    const user = await this.usersRepository.findByUsername(username);
+  async findUserIDByPhoneNumber(phoneNumber: string): Promise<AuthUser> {
+    const user = await this.usersRepository.findByPhoneNumber(phoneNumber);
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
     return {
       userID: user.userID,
-      username: user.username,
+      phoneNumber: user.phoneNumber,
     };
   }
 
   async changePassword(request: ChangePasswordDto): Promise<AuthUser> {
-    const { username, oldPassword, newPassword } = request;
-    const user = await this.usersRepository.findByUsername(username);
+    const { phoneNumber, oldPassword, newPassword } = request;
+    const user = await this.usersRepository.findByPhoneNumber(phoneNumber);
 
     if (
       !user ||
@@ -120,7 +120,7 @@ export class AuthService {
     await this.usersRepository.updatePasswordHash(user.userID, passwordHash);
     return {
       userID: user.userID,
-      username: user.username,
+      phoneNumber: user.phoneNumber,
     };
   }
 

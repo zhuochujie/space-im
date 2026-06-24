@@ -12,7 +12,7 @@ import {
   ChangePasswordDto,
   LoginDto,
   RegisterDto,
-  SearchUserByUsernameDto,
+  SearchUserByPhoneNumberDto,
 } from './dto/auth.dto';
 import type { AuthUser, LoginResponse } from './auth.types';
 
@@ -37,10 +37,10 @@ export class AuthController {
     return this.authService.changePassword(body);
   }
 
-  @Get('users/by-username')
-  async findUserIDByUsername(
-    @Query() query: SearchUserByUsernameDto,
+  @Get('users/by-phone-number')
+  async findUserIDByPhoneNumber(
+    @Query() query: SearchUserByPhoneNumberDto,
   ): Promise<AuthUser> {
-    return this.authService.findUserIDByUsername(query.username);
+    return this.authService.findUserIDByPhoneNumber(query.phoneNumber);
   }
 }

@@ -2,12 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
-  Modal,
-  Pressable,
   StatusBar,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import OpenIMSDK, {
@@ -34,6 +30,7 @@ import {
 } from './src/services/sessionStorage';
 import { colors } from './src/theme/colors';
 import type { AuthCredentials, AuthSession } from './src/types/app';
+import { getErrorMessage } from './src/utils/errors';
 import { showToast } from './src/utils/toast';
 
 const delay = (ms: number) =>
@@ -41,10 +38,24 @@ const delay = (ms: number) =>
     setTimeout(() => resolve(), ms);
   });
 
-const usernameValid = (username: string) =>
-  username.length >= 6 && username.length <= 32;
+const phoneNumberValid = (phoneNumber: string) =>
+  /^1[3-9]\d{9}$/.test(phoneNumber);
 
-const passwordValid = (password: string) => password.length >= 10;
+const passwordValid = (password: string) => password.length >= 6;
+
+const loginErrorMessage = (error: unknown) => {
+  const message = getErrorMessage(error);
+  if (
+    message.includes('Network request failed') ||
+    message.includes('Failed to fetch')
+  ) {
+    return '无法连接服务器，请检查网络或服务地址';
+  }
+  if (message.includes('业务服务请求失败')) {
+    return '登录服务暂时不可用，请稍后再试';
+  }
+  return message || '登录失败，请稍后再试';
+};
 
 function AppContent() {
   const [restoring, setRestoring] = useState(true);
@@ -52,8 +63,6 @@ function AppContent() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [profile, setProfile] = useState<SelfUserInfo>();
   const [connection, setConnection] = useState('未连接');
-  const [nicknameDraft, setNicknameDraft] = useState('');
-  const [nicknameSetupRequired, setNicknameSetupRequired] = useState(false);
   const sessionRef = useRef<AuthSession | undefined>(undefined);
   const initialized = useRef(false);
   const loginPromise = useRef<Promise<void> | undefined>(undefined);
@@ -204,7 +213,7 @@ function AppContent() {
               ex: '',
               faceURL: '',
               globalRecvMsgOpt: 0,
-              nickname: session.username,
+              nickname: session.phoneNumber,
               userID: session.userID,
             });
             setLoggedIn(true);
@@ -223,16 +232,16 @@ function AppContent() {
   }, [loginWithSession]);
 
   const login = async (credentials: AuthCredentials) => {
-    if (!credentials.username || !credentials.password) {
+    if (!credentials.phoneNumber || !credentials.password) {
       showToast('请输入账号和密码');
       return;
     }
-    if (!usernameValid(credentials.username)) {
-      showToast('用户名需 6-32 位');
+    if (!phoneNumberValid(credentials.phoneNumber)) {
+      showToast('请输入正确的手机号码');
       return;
     }
     if (!passwordValid(credentials.password)) {
-      showToast('密码至少 10 位');
+      showToast('密码至少 6 位');
       return;
     }
     setBusy(true);
@@ -243,25 +252,25 @@ function AppContent() {
       );
       await loginWithSession(session);
       await saveSession(session);
-    } catch {
+    } catch (error) {
       setConnection('连接失败');
-      showToast('登录失败');
+      showToast(loginErrorMessage(error));
     } finally {
       setBusy(false);
     }
   };
 
   const register = async (credentials: AuthCredentials) => {
-    if (!credentials.username || !credentials.password) {
+    if (!credentials.phoneNumber || !credentials.password) {
       showToast('请输入账号和密码');
       return;
     }
-    if (!usernameValid(credentials.username)) {
-      showToast('用户名需 6-32 位');
+    if (!phoneNumberValid(credentials.phoneNumber)) {
+      showToast('请输入正确的手机号码');
       return;
     }
     if (!passwordValid(credentials.password)) {
-      showToast('密码至少 10 位');
+      showToast('密码至少 6 位');
       return;
     }
     setBusy(true);
@@ -273,21 +282,13 @@ function AppContent() {
       );
       await loginWithSession(session);
       await saveSession(session);
-      setNicknameSetupRequired(true);
-      setNicknameDraft('');
-    } catch {
+    } catch (error) {
       setConnection('连接失败');
-      showToast('注册失败');
+      showToast(loginErrorMessage(error));
     } finally {
       setBusy(false);
     }
   };
-
-  useEffect(() => {
-    if (loggedIn && profile && !profile.nickname?.trim()) {
-      setNicknameDraft('');
-    }
-  }, [loggedIn, profile]);
 
   const logout = async () => {
     setBusy(true);
@@ -299,7 +300,6 @@ function AppContent() {
       await clearSession();
       setLoggedIn(false);
       setProfile(undefined);
-      setNicknameSetupRequired(false);
       sessionRef.current = undefined;
       setConnection('未连接');
       setBusy(false);
@@ -307,20 +307,20 @@ function AppContent() {
   };
 
   const changePassword = async (oldPassword: string, newPassword: string) => {
-    const username = sessionRef.current?.username;
-    if (!username) {
-      showToast('当前登录信息缺少用户名');
+    const phoneNumber = sessionRef.current?.phoneNumber;
+    if (!phoneNumber) {
+      showToast('当前登录信息缺少手机号');
       return false;
     }
     if (!passwordValid(oldPassword) || !passwordValid(newPassword)) {
-      showToast('密码至少 10 位');
+      showToast('密码至少 6 位');
       return false;
     }
     setBusy(true);
     try {
       await changeLoginPassword(
         DEFAULT_SERVER_CONFIG.chatServerAddr,
-        username,
+        phoneNumber,
         oldPassword,
         newPassword,
       );
@@ -371,7 +371,6 @@ function AppContent() {
           ? { ...current, nickname: nextNickname, faceURL: faceURL || '' }
           : current),
       );
-      setNicknameSetupRequired(false);
       showToast('资料已修改');
       return true;
     } catch {
@@ -394,62 +393,16 @@ function AppContent() {
     return <LoginScreen busy={busy} onLogin={login} onRegister={register} />;
   }
 
-  const nicknameRequired =
-    loggedIn &&
-    Boolean(profile) &&
-    (nicknameSetupRequired || !profile?.nickname?.trim());
-
   return (
-    <>
-      <MainScreen
-        config={DEFAULT_SERVER_CONFIG}
-        connection={connection}
-        onChangePassword={changePassword}
-        onChangeProfile={changeProfile}
-        onLogout={logout}
-        profile={profile}
-        username={sessionRef.current?.username}
-      />
-      <Modal animationType="fade" transparent visible={nicknameRequired}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>设置昵称</Text>
-            <Text style={styles.modalBody}>请先设置你的聊天昵称</Text>
-            <TextInput
-              autoCorrect={false}
-              autoFocus
-              editable={!busy}
-              onChangeText={setNicknameDraft}
-              onSubmitEditing={() =>
-                changeProfile({ nickname: nicknameDraft }).catch(
-                  () => undefined,
-                )
-              }
-              placeholder="输入昵称"
-              placeholderTextColor="#A4ADBC"
-              returnKeyType="done"
-              style={styles.nicknameInput}
-              value={nicknameDraft}
-            />
-            <Pressable
-              disabled={busy}
-              onPress={() =>
-                changeProfile({ nickname: nicknameDraft }).catch(
-                  () => undefined,
-                )
-              }
-              style={[styles.confirmButton, busy && styles.buttonDisabled]}
-            >
-              {busy ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.confirmText}>保存</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </>
+    <MainScreen
+      config={DEFAULT_SERVER_CONFIG}
+      connection={connection}
+      onChangePassword={changePassword}
+      onChangeProfile={changeProfile}
+      onLogout={logout}
+      profile={profile}
+      phoneNumber={sessionRef.current?.phoneNumber}
+    />
   );
 }
 
@@ -459,60 +412,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
-  },
-  modalBackdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: 'rgba(15, 23, 42, 0.36)',
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    padding: 22,
-  },
-  modalTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  modalBody: {
-    marginTop: 8,
-    color: colors.muted,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  nicknameInput: {
-    height: 48,
-    marginTop: 18,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    paddingHorizontal: 14,
-    color: colors.text,
-    fontSize: 15,
-  },
-  confirmButton: {
-    height: 46,
-    marginTop: 16,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  confirmText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
   },
 });
 

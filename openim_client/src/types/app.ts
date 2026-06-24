@@ -7,14 +7,14 @@ export type ServerConfig = {
 };
 
 export type AuthCredentials = {
-  username: string;
+  phoneNumber: string;
   password: string;
   nickname?: string;
 };
 
 export type AuthSession = {
   userID: string;
-  username: string;
+  phoneNumber: string;
   token: string;
   expireTimeSeconds: number;
 };

@@ -22,7 +22,7 @@ import { colors } from '../theme/colors';
 import type { ChatTarget, MainTab, ServerConfig } from '../types/app';
 import { getErrorCode, getErrorMessage } from '../utils/errors';
 import { showToast } from '../utils/toast';
-import { getUserByUsername } from '../services/chatApi';
+import { getUserByPhoneNumber } from '../services/chatApi';
 import { ChatScreen } from './ChatScreen';
 import { ContactsScreen } from './ContactsScreen';
 import { ConversationsScreen } from './ConversationsScreen';
@@ -32,7 +32,7 @@ type Props = {
   config: ServerConfig;
   connection: string;
   profile?: SelfUserInfo;
-  username?: string;
+  phoneNumber?: string;
   onChangePassword: (
     oldPassword: string,
     newPassword: string,
@@ -71,7 +71,7 @@ export function MainScreen({
   onChangeProfile,
   onChangePassword,
   profile,
-  username,
+  phoneNumber,
   onLogout,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -354,15 +354,19 @@ export function MainScreen({
   };
 
   const addFriend = async (
-    friendUsername: string,
+    friendPhoneNumber: string,
     message: string,
   ): Promise<boolean> => {
     try {
-      const target = await getUserByUsername(
+      const target = await getUserByPhoneNumber(
         config.chatServerAddr,
-        friendUsername.trim(),
+        friendPhoneNumber.trim(),
       );
-      return await sendFriendRequest(target.userID, message, target.username);
+      return await sendFriendRequest(
+        target.userID,
+        message,
+        target.phoneNumber,
+      );
     } catch (error) {
       const messageText = getErrorMessage(error);
       if (messageText.includes('用户不存在')) {
@@ -631,8 +635,8 @@ export function MainScreen({
           friend={currentFriend}
           friends={friends}
           group={currentGroup}
-          onAddFriend={() =>
-            sendFriendRequest(chat.userID, '你好，我想添加你为好友', chat.title)
+          onAddFriend={(userID, title) =>
+            sendFriendRequest(userID, '你好，我想添加你为好友', title)
           }
           onBack={() => {
             setChat(undefined);
@@ -735,7 +739,7 @@ export function MainScreen({
             onChangeProfile={onChangeProfile}
             onLogout={onLogout}
             profile={profile}
-            username={username}
+            phoneNumber={phoneNumber}
           />
         )}
       </View>

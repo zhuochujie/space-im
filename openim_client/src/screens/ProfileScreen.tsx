@@ -14,12 +14,17 @@ import { launchImageLibrary } from 'react-native-image-picker';
 
 import { Avatar } from '../components/Avatar';
 import { colors } from '../theme/colors';
-import { fileExtension, localMediaPath, mediaUri } from '../utils/media';
+import {
+  avatarPickerOptions,
+  fileExtension,
+  localMediaPath,
+  mediaUri,
+} from '../utils/media';
 import { showToast } from '../utils/toast';
 
 type Props = {
   profile?: SelfUserInfo;
-  username?: string;
+  phoneNumber?: string;
   onChangePassword: (
     oldPassword: string,
     newPassword: string,
@@ -35,7 +40,7 @@ type Props = {
 
 export function ProfileScreen({
   profile,
-  username,
+  phoneNumber,
   onChangePassword,
   onChangeProfile,
   onLogout,
@@ -89,10 +94,7 @@ export function ProfileScreen({
     if (saving) {
       return;
     }
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 1,
-    });
+    const result = await launchImageLibrary(avatarPickerOptions);
     if (result.didCancel) {
       return;
     }
@@ -150,8 +152,8 @@ export function ProfileScreen({
       showToast('请填写完整密码');
       return;
     }
-    if (newPassword.length < 10) {
-      showToast('新密码至少 10 位');
+    if (newPassword.length < 6) {
+      showToast('新密码至少 6 位');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -173,16 +175,16 @@ export function ProfileScreen({
     <View style={styles.page}>
       <View style={styles.profileCard}>
         <Avatar
-          name={profile?.nickname || username || '?'}
+          name={profile?.nickname || phoneNumber || '?'}
           size={72}
           uri={profile?.faceURL}
         />
         <View style={styles.identity}>
           <Text numberOfLines={1} style={styles.name}>
-            {profile?.nickname || username || '未设置昵称'}
+            {profile?.nickname || phoneNumber || '未设置昵称'}
           </Text>
-          {username ? (
-            <Text style={styles.username}>账号: {username}</Text>
+          {phoneNumber ? (
+            <Text style={styles.phoneNumber}>手机号: {phoneNumber}</Text>
           ) : null}
         </View>
         <Pressable
@@ -259,7 +261,7 @@ export function ProfileScreen({
               style={styles.avatarEditor}
             >
               <Avatar
-                name={nicknameDraft || profile?.nickname || username || '?'}
+                name={nicknameDraft || profile?.nickname || phoneNumber || '?'}
                 size={78}
                 uri={avatarDraftUri}
               />
@@ -412,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  username: { fontSize: 13, color: colors.muted, marginTop: 6 },
+  phoneNumber: { fontSize: 13, color: colors.muted, marginTop: 6 },
   settingsCard: {
     backgroundColor: colors.card,
     borderRadius: 18,

@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   BackHandler,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -37,19 +36,26 @@ import OpenIMSDK, {
   ViewType,
 } from '@openim/rn-client-sdk';
 import RNFS from 'react-native-fs';
-import { launchImageLibrary, type MediaType } from 'react-native-image-picker';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+  type MediaType,
+} from 'react-native-image-picker';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import type { createSound } from 'react-native-nitro-sound';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '../components/Avatar';
+import { CachedImage } from '../components/CachedImage';
 import { EmptyState } from '../components/EmptyState';
 import { colors } from '../theme/colors';
 import type { ChatTarget } from '../types/app';
 import { copyMessageText } from '../utils/clipboard';
 import { groupMemberRoleText } from '../utils/group';
 import {
+  avatarPickerOptions,
   fileExtension,
   localMediaPath,
   mediaUri,
@@ -62,11 +68,23 @@ import { requestRecordPermission, voiceDurationText } from '../utils/voice';
 
 const GROUP_MEMBER_PREVIEW_COUNT = 7;
 const GROUP_MEMBER_PAGE_SIZE = 50;
+const MODAL_DISMISS_DELAY_MS = 280;
+
+const waitForModalDismiss = () =>
+  new Promise<void>(resolve => {
+    setTimeout(() => resolve(), MODAL_DISMISS_DELAY_MS);
+  });
 
 type SoundInstance = ReturnType<typeof createSound>;
 type RecordBackEvent = Parameters<
   Parameters<SoundInstance['addRecordBackListener']>[0]
 >[0];
+
+type PendingSaveMedia = {
+  fallbackExtension: 'jpg' | 'mp4';
+  type: 'photo' | 'video';
+  uri: string;
+};
 
 type Props = {
   target: ChatTarget;
@@ -75,7 +93,7 @@ type Props = {
   friend?: FriendUserItem;
   group?: GroupItem;
   onBack: () => void;
-  onAddFriend: () => Promise<boolean>;
+  onAddFriend: (userID: string, title: string) => Promise<boolean>;
   onSetRemark: (remark: string) => Promise<boolean>;
   onDeleteFriend: () => Promise<boolean>;
   onQuitGroup: () => Promise<boolean>;
@@ -108,6 +126,8 @@ export function ChatScreen({
     thumbnail?: string;
     uri: string;
   }>();
+  const [pendingSaveMedia, setPendingSaveMedia] = useState<PendingSaveMedia>();
+  const [savingPreviewMedia, setSavingPreviewMedia] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [userInfo, setUserInfo] = useState<PublicUserItem>();
@@ -137,6 +157,7 @@ export function ChatScreen({
   );
   const [mentionPickerVisible, setMentionPickerVisible] = useState(false);
   const [mentionPickerLoading, setMentionPickerLoading] = useState(false);
+  const [mediaPickerVisible, setMediaPickerVisible] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<GroupMemberItem[]>(
     [],
   );
@@ -185,6 +206,13 @@ export function ChatScreen({
       (selfGroupRole === GroupMemberRole.Admin &&
         selectedMember?.roleLevel === GroupMemberRole.Normal));
   const displayedMessages = useMemo(() => [...messages].reverse(), [messages]);
+  const selectedMemberFriend = selectedMember
+    ? friends.find(item => item.userID === selectedMember.userID)
+    : undefined;
+  const canAddSelectedMember =
+    Boolean(selectedMember) &&
+    selectedMember?.userID !== selfUserID &&
+    !selectedMemberFriend;
   const inviteCandidates = useMemo(() => {
     const memberUserIDs = new Set(groupMembers.map(member => member.userID));
     return friends.filter(item => !memberUserIDs.has(item.userID));
@@ -460,27 +488,7 @@ export function ChatScreen({
     }
   };
 
-  const selectAndSendMedia = async () => {
-    if (sending || !canSendMessage) {
-      return;
-    }
-    const result = await launchImageLibrary({
-      mediaType: 'mixed',
-      selectionLimit: 1,
-      videoQuality: 'high',
-      formatAsMp4: true,
-    });
-    if (result.didCancel) {
-      return;
-    }
-    if (result.errorCode) {
-      showToast('选择失败');
-      return;
-    }
-    const asset = result.assets?.[0];
-    if (!asset) {
-      return;
-    }
+  const sendMediaAsset = async (asset: Asset) => {
     const mediaType: Exclude<MediaType, 'mixed'> = asset.type?.startsWith(
       'video/',
     )
@@ -513,6 +521,75 @@ export function ChatScreen({
     } finally {
       setSending(false);
     }
+  };
+
+  const handlePickedMedia = async (
+    asset: Asset | undefined,
+    errorMessage: string,
+  ) => {
+    if (!asset) {
+      return;
+    }
+    try {
+      await sendMediaAsset(asset);
+    } catch {
+      showToast(errorMessage);
+    }
+  };
+
+  const pickMediaFromAlbum = async () => {
+    setMediaPickerVisible(false);
+    if (sending || !canSendMessage) {
+      return;
+    }
+    await waitForModalDismiss();
+    const result = await launchImageLibrary({
+      mediaType: 'mixed',
+      selectionLimit: 1,
+      videoQuality: 'high',
+      formatAsMp4: true,
+    });
+    if (result.didCancel) {
+      return;
+    }
+    if (result.errorCode) {
+      showToast('选择失败');
+      return;
+    }
+    await handlePickedMedia(result.assets?.[0], '发送失败');
+  };
+
+  const takePhotoAndSend = async () => {
+    setMediaPickerVisible(false);
+    if (sending || !canSendMessage) {
+      return;
+    }
+    await waitForModalDismiss();
+    const result = await launchCamera({
+      mediaType: 'photo',
+      cameraType: 'back',
+      saveToPhotos: false,
+      maxWidth: 1920,
+      maxHeight: 1920,
+      quality: 0.9,
+    });
+    if (result.didCancel) {
+      return;
+    }
+    if (result.errorCode) {
+      showToast(
+        result.errorCode === 'permission' ? '未获得相机权限' : '拍照失败',
+      );
+      return;
+    }
+    await handlePickedMedia(result.assets?.[0], '图片发送失败');
+  };
+
+  const openMediaPicker = () => {
+    if (sending || !canSendMessage) {
+      return;
+    }
+    setMediaPickerVisible(true);
   };
 
   const getSound = async () => {
@@ -737,15 +814,40 @@ export function ChatScreen({
     type: 'photo' | 'video',
     fallbackExtension: 'jpg' | 'mp4',
   ) => {
-    const confirmed = await showConfirm({
-      title: type === 'photo' ? '保存图片' : '保存视频',
-      message: '保存到系统相册？',
-      confirmText: '保存',
-      cancelText: '取消',
-    });
-    if (confirmed) {
-      await saveMediaToAlbum(uri, type, fallbackExtension);
+    setPendingSaveMedia({ fallbackExtension, type, uri });
+  };
+
+  const savePendingPreviewMedia = async () => {
+    if (!pendingSaveMedia || savingPreviewMedia) {
+      return;
     }
+    const mediaType = pendingSaveMedia.type;
+    setSavingPreviewMedia(true);
+    try {
+      await saveMediaToAlbum(
+        pendingSaveMedia.uri,
+        mediaType,
+        pendingSaveMedia.fallbackExtension,
+      );
+      setPendingSaveMedia(undefined);
+      if (mediaType === 'photo') {
+        setPreviewImage('');
+      } else {
+        setPreviewVideo(undefined);
+      }
+    } finally {
+      setSavingPreviewMedia(false);
+    }
+  };
+
+  const closePreviewImage = () => {
+    setPendingSaveMedia(undefined);
+    setPreviewImage('');
+  };
+
+  const closePreviewVideo = () => {
+    setPendingSaveMedia(undefined);
+    setPreviewVideo(undefined);
   };
 
   const saveRemark = async () => {
@@ -809,10 +911,7 @@ export function ChatScreen({
     if (saving || !canEditGroupInfo) {
       return;
     }
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 1,
-    });
+    const result = await launchImageLibrary(avatarPickerOptions);
     if (result.didCancel) {
       return;
     }
@@ -888,15 +987,31 @@ export function ChatScreen({
     }
   };
 
-  const addFriend = async () => {
-    if (saving) {
+  const addCurrentTargetFriend = async () => {
+    if (saving || friend) {
       return;
     }
     setSaving(true);
     try {
-      const succeeded = await onAddFriend();
+      const succeeded = await onAddFriend(target.userID, target.title);
       if (succeeded) {
         setSettingsVisible(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSelectedMemberFriend = async () => {
+    if (!selectedMember || saving || selectedMemberFriend) {
+      return;
+    }
+    setSaving(true);
+    try {
+      const title = selectedMember.nickname || selectedMember.userID;
+      const succeeded = await onAddFriend(selectedMember.userID, title);
+      if (succeeded) {
+        closeMemberDetails();
       }
     } finally {
       setSaving(false);
@@ -1086,15 +1201,27 @@ export function ChatScreen({
       'hardwareBackPress',
       () => {
         if (previewImage) {
-          setPreviewImage('');
+          if (pendingSaveMedia) {
+            setPendingSaveMedia(undefined);
+            return true;
+          }
+          closePreviewImage();
           return true;
         }
         if (previewVideo) {
-          setPreviewVideo(undefined);
+          if (pendingSaveMedia) {
+            setPendingSaveMedia(undefined);
+            return true;
+          }
+          closePreviewVideo();
           return true;
         }
         if (mentionPickerVisible) {
           setMentionPickerVisible(false);
+          return true;
+        }
+        if (mediaPickerVisible) {
+          setMediaPickerVisible(false);
           return true;
         }
         if (remarkModalVisible) {
@@ -1138,8 +1265,10 @@ export function ChatScreen({
     groupMembersPageVisible,
     inviteVisible,
     memberModalVisible,
+    mediaPickerVisible,
     mentionPickerVisible,
     onBack,
+    pendingSaveMedia,
     previewImage,
     previewVideo,
     remarkModalVisible,
@@ -1172,6 +1301,28 @@ export function ChatScreen({
     setSelectedMember(member);
     setKickConfirmationVisible(false);
     setMemberModalVisible(true);
+  };
+
+  const openMessageSenderDetails = (message: MessageItem) => {
+    if (!isGroupChat || message.sendID === selfUserID) {
+      return;
+    }
+    const member = groupMembers.find(item => item.userID === message.sendID);
+    openMemberDetails(
+      member ?? {
+        ex: '',
+        faceURL: message.senderFaceUrl || '',
+        groupID: target.groupID,
+        inviterUserID: '',
+        joinSource: GroupJoinSource.Invitation,
+        joinTime: 0,
+        muteEndTime: 0,
+        nickname: message.senderNickname || '群成员',
+        operatorUserID: '',
+        roleLevel: GroupMemberRole.Normal,
+        userID: message.sendID,
+      },
+    );
   };
 
   const openAllGroupMembers = () => {
@@ -1322,7 +1473,7 @@ export function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.page}
     >
       <View style={styles.header}>
@@ -1411,6 +1562,7 @@ export function ChatScreen({
                   <Pressable
                     disabled={!isGroupChat || !canSendMessage}
                     onLongPress={() => mentionMessageSender(item)}
+                    onPress={() => openMessageSenderDetails(item)}
                     style={styles.messageAvatarButton}
                   >
                     <Avatar name={senderName} size={36} uri={senderFaceURL} />
@@ -1433,10 +1585,10 @@ export function ChatScreen({
                   >
                     {item.pictureElem && imageSource ? (
                       <Pressable onPress={() => setPreviewImage(imageSource)}>
-                        <Image
+                        <CachedImage
                           resizeMode="cover"
-                          source={{ uri: imageSource }}
                           style={styles.mediaImage}
+                          uri={imageSource}
                         />
                       </Pressable>
                     ) : item.videoElem ? (
@@ -1445,10 +1597,10 @@ export function ChatScreen({
                         style={styles.videoPreview}
                       >
                         {videoThumbnail ? (
-                          <Image
+                          <CachedImage
                             resizeMode="cover"
-                            source={{ uri: videoThumbnail }}
                             style={styles.mediaImage}
+                            uri={videoThumbnail}
                           />
                         ) : (
                           <View style={styles.videoPlaceholder} />
@@ -1612,7 +1764,7 @@ export function ChatScreen({
             />
             <Pressable
               disabled={sending || !canSendMessage}
-              onPress={selectAndSendMedia}
+              onPress={openMediaPicker}
               style={[
                 styles.mediaButton,
                 styles.mediaButtonRight,
@@ -1626,54 +1778,118 @@ export function ChatScreen({
       </View>
       <Modal
         animationType="fade"
-        onRequestClose={() => setPreviewImage('')}
+        onRequestClose={() => setMediaPickerVisible(false)}
+        transparent
+        visible={mediaPickerVisible}
+      >
+        <Pressable
+          onPress={() => setMediaPickerVisible(false)}
+          style={styles.actionSheetBackdrop}
+        >
+          <Pressable style={styles.actionSheet}>
+            <Text style={styles.actionSheetTitle}>发送媒体</Text>
+            <Pressable
+              disabled={sending || !canSendMessage}
+              onPress={takePhotoAndSend}
+              style={styles.actionSheetItem}
+            >
+              <MaterialCommunityIcons
+                color={colors.primary}
+                name="camera-outline"
+                size={24}
+              />
+              <Text style={styles.actionSheetItemText}>拍照</Text>
+            </Pressable>
+            <Pressable
+              disabled={sending || !canSendMessage}
+              onPress={pickMediaFromAlbum}
+              style={styles.actionSheetItem}
+            >
+              <MaterialCommunityIcons
+                color={colors.primary}
+                name="image-multiple-outline"
+                size={24}
+              />
+              <Text style={styles.actionSheetItemText}>从相册选择</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setMediaPickerVisible(false)}
+              style={styles.actionSheetCancel}
+            >
+              <Text style={styles.actionSheetCancelText}>取消</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        animationType="fade"
+        onRequestClose={closePreviewImage}
         transparent
         visible={Boolean(previewImage)}
       >
-        <Pressable
-          onPress={() => setPreviewImage('')}
-          style={styles.previewBackdrop}
-        >
+        <Pressable onPress={closePreviewImage} style={styles.previewBackdrop}>
           {previewImage ? (
             <Pressable
               onLongPress={() =>
                 confirmSaveMedia(previewImage, 'photo', 'jpg')
               }
-              onPress={() => setPreviewImage('')}
+              onPress={closePreviewImage}
               style={styles.previewMediaTouchable}
             >
-              <Image
+              <CachedImage
                 resizeMode="contain"
-                source={{ uri: previewImage }}
                 style={styles.previewImage}
+                uri={previewImage}
               />
+            </Pressable>
+          ) : null}
+          {pendingSaveMedia?.type === 'photo' ? (
+            <Pressable style={styles.previewSaveSheet}>
+              <Text style={styles.previewSaveTitle}>保存图片到相册？</Text>
+              <View style={styles.previewSaveActions}>
+                <Pressable
+                  disabled={savingPreviewMedia}
+                  onPress={() => setPendingSaveMedia(undefined)}
+                  style={styles.previewSaveCancel}
+                >
+                  <Text style={styles.previewSaveCancelText}>取消</Text>
+                </Pressable>
+                <Pressable
+                  disabled={savingPreviewMedia}
+                  onPress={savePendingPreviewMedia}
+                  style={styles.previewSaveConfirm}
+                >
+                  {savingPreviewMedia ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.previewSaveConfirmText}>保存</Text>
+                  )}
+                </Pressable>
+              </View>
             </Pressable>
           ) : null}
         </Pressable>
       </Modal>
       <Modal
         animationType="fade"
-        onRequestClose={() => setPreviewVideo(undefined)}
+        onRequestClose={closePreviewVideo}
         transparent
         visible={Boolean(previewVideo)}
       >
-        <Pressable
-          onPress={() => setPreviewVideo(undefined)}
-          style={styles.previewBackdrop}
-        >
+        <Pressable onPress={closePreviewVideo} style={styles.previewBackdrop}>
           {previewVideo ? (
             <Pressable
               onLongPress={() =>
                 confirmSaveMedia(previewVideo.uri, 'video', 'mp4')
               }
-              onPress={() => setPreviewVideo(undefined)}
+              onPress={closePreviewVideo}
               style={styles.previewMediaTouchable}
             >
               {previewVideo.thumbnail ? (
-                <Image
+                <CachedImage
                   resizeMode="contain"
-                  source={{ uri: previewVideo.thumbnail }}
                   style={styles.previewImage}
+                  uri={previewVideo.thumbnail}
                 />
               ) : (
                 <View style={styles.previewVideoPlaceholder}>
@@ -1700,6 +1916,31 @@ export function ChatScreen({
                   style={styles.playIcon}
                 />
               </Pressable>
+            </Pressable>
+          ) : null}
+          {pendingSaveMedia?.type === 'video' ? (
+            <Pressable style={styles.previewSaveSheet}>
+              <Text style={styles.previewSaveTitle}>保存视频到相册？</Text>
+              <View style={styles.previewSaveActions}>
+                <Pressable
+                  disabled={savingPreviewMedia}
+                  onPress={() => setPendingSaveMedia(undefined)}
+                  style={styles.previewSaveCancel}
+                >
+                  <Text style={styles.previewSaveCancelText}>取消</Text>
+                </Pressable>
+                <Pressable
+                  disabled={savingPreviewMedia}
+                  onPress={savePendingPreviewMedia}
+                  style={styles.previewSaveConfirm}
+                >
+                  {savingPreviewMedia ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.previewSaveConfirmText}>保存</Text>
+                  )}
+                </Pressable>
+              </View>
             </Pressable>
           ) : null}
         </Pressable>
@@ -1930,7 +2171,7 @@ export function ChatScreen({
             ) : (
               <Pressable
                 disabled={saving}
-                onPress={addFriend}
+                onPress={addCurrentTargetFriend}
                 style={[
                   styles.modalButton,
                   saving && styles.modalButtonDisabled,
@@ -2251,6 +2492,33 @@ export function ChatScreen({
                     {groupMemberRoleText(selectedMember.roleLevel)}
                   </Text>
                 </View>
+                <View style={styles.memberDetailRoleRow}>
+                  <Text style={styles.memberDetailRoleLabel}>好友关系</Text>
+                  <Text style={styles.memberDetailRoleValue}>
+                    {selectedMember.userID === selfUserID
+                      ? '我自己'
+                      : selectedMemberFriend
+                        ? '已是好友'
+                        : '未添加'}
+                  </Text>
+                </View>
+                {canAddSelectedMember && (
+                  <Pressable
+                    disabled={saving || kickConfirmationVisible}
+                    onPress={addSelectedMemberFriend}
+                    style={[
+                      styles.memberActionButton,
+                      (saving || kickConfirmationVisible) &&
+                        styles.modalButtonDisabled,
+                    ]}
+                  >
+                    {saving && !kickConfirmationVisible ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.modalButtonText}>添加好友</Text>
+                    )}
+                  </Pressable>
+                )}
                 {canManageSelectedMemberRole && (
                   <Pressable
                     disabled={saving || kickConfirmationVisible}
@@ -2660,6 +2928,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   sendButtonDisabled: { backgroundColor: '#BCC6D6' },
+  actionSheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(14, 22, 36, 0.38)',
+  },
+  actionSheet: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 22,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: colors.card,
+  },
+  actionSheetTitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  actionSheetItem: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  actionSheetItemText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  actionSheetCancel: {
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  actionSheetCancelText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   previewBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.92)',
@@ -2690,6 +3003,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  previewSaveSheet: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    bottom: 28,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    padding: 14,
+  },
+  previewSaveTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  previewSaveActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  previewSaveCancel: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewSaveConfirm: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewSaveCancelText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  previewSaveConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   detailsPage: {
     ...StyleSheet.absoluteFill,

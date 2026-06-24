@@ -14,7 +14,7 @@ export class User {
   userID!: string;
 
   @Prop({ required: true, unique: true, index: true })
-  username!: string;
+  phoneNumber!: string;
 
   @Prop({ required: true })
   passwordHash!: string;

@@ -1,9 +1,18 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import RNFS from 'react-native-fs';
-import type { Asset } from 'react-native-image-picker';
+import type { Asset, ImageLibraryOptions } from 'react-native-image-picker';
 
+import { cacheResource } from './resourceCache';
 import { showToast } from './toast';
+
+export const avatarPickerOptions: ImageLibraryOptions = {
+  mediaType: 'photo',
+  selectionLimit: 1,
+  maxWidth: 512,
+  maxHeight: 512,
+  quality: 0.8,
+};
 
 export const mediaUri = (value?: string) => {
   const uri = value?.trim();
@@ -67,6 +76,9 @@ const cacheMediaForCameraRoll = async (
     }/openim-save-${Date.now()}.${fallbackExtension}`;
     await RNFS.copyFile(uri, destination);
     return `file://${destination}`;
+  }
+  if (uri.startsWith('http://') || uri.startsWith('https://')) {
+    return cacheResource(uri);
   }
   const extension = cacheMediaExtension(uri, fallbackExtension);
   const destination = `${

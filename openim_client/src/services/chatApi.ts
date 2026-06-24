@@ -8,7 +8,7 @@ type ApiResponse<T> = {
   data: T | null;
 };
 
-type UsernameLookupResult = Pick<AuthSession, 'userID' | 'username'>;
+type PhoneNumberLookupResult = Pick<AuthSession, 'userID' | 'phoneNumber'>;
 
 async function postApi<T>(
   chatServerAddr: string,
@@ -66,11 +66,11 @@ export async function registerAccount(
   chatServerAddr: string,
   credentials: AuthCredentials,
 ) {
-  return postApi<Pick<AuthSession, 'userID' | 'username'>>(
+  return postApi<Pick<AuthSession, 'userID' | 'phoneNumber'>>(
     chatServerAddr,
     '/auth/register',
     {
-      username: credentials.username,
+      phoneNumber: credentials.phoneNumber,
       password: credentials.password,
       nickname: credentials.nickname,
     },
@@ -82,7 +82,7 @@ export async function loginAccount(
   credentials: AuthCredentials,
 ): Promise<AuthSession> {
   const result = await postApi<AuthSession>(chatServerAddr, '/auth/login', {
-    username: credentials.username,
+    phoneNumber: credentials.phoneNumber,
     password: credentials.password,
     platformID: platformID(),
   });
@@ -92,25 +92,31 @@ export async function loginAccount(
   return result;
 }
 
-export async function getUserByUsername(
+export async function getUserByPhoneNumber(
   chatServerAddr: string,
-  username: string,
-): Promise<UsernameLookupResult> {
-  return getApi<UsernameLookupResult>(
+  phoneNumber: string,
+): Promise<PhoneNumberLookupResult> {
+  return getApi<PhoneNumberLookupResult>(
     chatServerAddr,
-    `/auth/users/by-username?username=${encodeURIComponent(username)}`,
+    `/auth/users/by-phone-number?phoneNumber=${encodeURIComponent(
+      phoneNumber,
+    )}`,
   );
 }
 
 export async function changeLoginPassword(
   chatServerAddr: string,
-  username: string,
+  phoneNumber: string,
   oldPassword: string,
   newPassword: string,
-): Promise<UsernameLookupResult> {
-  return postApi<UsernameLookupResult>(chatServerAddr, '/auth/change-password', {
-    username,
-    oldPassword,
-    newPassword,
-  });
+): Promise<PhoneNumberLookupResult> {
+  return postApi<PhoneNumberLookupResult>(
+    chatServerAddr,
+    '/auth/change-password',
+    {
+      phoneNumber,
+      oldPassword,
+      newPassword,
+    },
+  );
 }

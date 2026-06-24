@@ -8,21 +8,22 @@ import {
   Min,
 } from 'class-validator';
 
-const USERNAME_PATTERN = /^[A-Za-z0-9_.-]+$/;
+const PHONE_PATTERN = /^1[3-9]\d{9}$/;
+const PHONE_MESSAGE = '手机号格式不正确';
+const PASSWORD_LENGTH_MESSAGE = '密码长度必须为 6-128 位';
 
 export class AuthCredentialsDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsString({ message: '用户名必须是字符串' })
-  @Length(6, 32, { message: '用户名长度必须为 3-32 位' })
-  @Matches(USERNAME_PATTERN, {
-    message: '用户名只能包含字母、数字、下划线、点和短横线',
+  @IsString({ message: '手机号必须是字符串' })
+  @Matches(PHONE_PATTERN, {
+    message: PHONE_MESSAGE,
   })
-  username!: string;
+  phoneNumber!: string;
 
   @IsString({ message: '密码必须是字符串' })
-  @Length(10, 128, { message: '密码长度必须为 8-128 位' })
+  @Length(6, 128, { message: PASSWORD_LENGTH_MESSAGE })
   password!: string;
 }
 
@@ -46,30 +47,28 @@ export class ChangePasswordDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsString({ message: '用户名必须是字符串' })
-  @Length(6, 32, { message: '用户名长度必须为 3-32 位' })
-  @Matches(USERNAME_PATTERN, {
-    message: '用户名只能包含字母、数字、下划线、点和短横线',
+  @IsString({ message: '手机号必须是字符串' })
+  @Matches(PHONE_PATTERN, {
+    message: PHONE_MESSAGE,
   })
-  username!: string;
+  phoneNumber!: string;
 
   @IsString({ message: '旧密码必须是字符串' })
-  @Length(10, 128, { message: '旧密码长度必须为 8-128 位' })
+  @Length(6, 128, { message: '旧密码长度必须为 6-128 位' })
   oldPassword!: string;
 
   @IsString({ message: '新密码必须是字符串' })
-  @Length(10, 128, { message: '新密码长度必须为 8-128 位' })
+  @Length(6, 128, { message: '新密码长度必须为 6-128 位' })
   newPassword!: string;
 }
 
-export class SearchUserByUsernameDto {
+export class SearchUserByPhoneNumberDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsString({ message: '用户名必须是字符串' })
-  @Length(3, 32, { message: '用户名长度必须为 3-32 位' })
-  @Matches(USERNAME_PATTERN, {
-    message: '用户名只能包含字母、数字、下划线、点和短横线',
+  @IsString({ message: '手机号必须是字符串' })
+  @Matches(PHONE_PATTERN, {
+    message: PHONE_MESSAGE,
   })
-  username!: string;
+  phoneNumber!: string;
 }

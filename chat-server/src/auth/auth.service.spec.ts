@@ -14,7 +14,7 @@ describe('AuthService', () => {
   let repository: jest.Mocked<
     Pick<
       UsersRepository,
-      | 'findByUsername'
+      | 'findByPhoneNumber'
       | 'reserve'
       | 'activate'
       | 'deletePending'
@@ -26,16 +26,16 @@ describe('AuthService', () => {
   beforeEach(() => {
     users = new Map();
     repository = {
-      findByUsername: jest.fn((username: string) =>
+      findByPhoneNumber: jest.fn((phoneNumber: string) =>
         Promise.resolve(
-          users.get(username)?.status === 'active' ? users.get(username) : null,
+          users.get(phoneNumber)?.status === 'active' ? users.get(phoneNumber) : null,
         ),
       ),
       reserve: jest.fn((user) => {
-        if (users.has(user.username)) {
-          return Promise.reject(new ConflictException('用户名已存在'));
+        if (users.has(user.phoneNumber)) {
+          return Promise.reject(new ConflictException('手机号已注册'));
         }
-        users.set(user.username, { ...user, status: 'pending' });
+        users.set(user.phoneNumber, { ...user, status: 'pending' });
         return Promise.resolve();
       }),
       activate: jest.fn((userID: string) => {
@@ -52,7 +52,7 @@ describe('AuthService', () => {
           (candidate) => candidate.userID === userID,
         );
         if (user?.status === 'pending') {
-          users.delete(user.username);
+          users.delete(user.phoneNumber);
         }
         return Promise.resolve();
       }),
@@ -81,23 +81,23 @@ describe('AuthService', () => {
 
   it('registers the user in OpenIM and stores a password hash', async () => {
     const result = await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       password: 'password123',
     });
 
-    expect(result.username).toBe('alice');
+    expect(result.phoneNumber).toBe('13800138000');
     expect(result.userID).toMatch(/^\d{10}$/);
-    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, 'alice');
+    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, '13800138000');
     const storedUser = repository.reserve.mock.calls[0][0];
     expect(storedUser.userID).toBe(result.userID);
-    expect(storedUser.username).toBe('alice');
+    expect(storedUser.phoneNumber).toBe('13800138000');
     expect(storedUser.passwordHash).toMatch(/^\$argon2id\$/);
     expect(repository.activate).toHaveBeenCalledWith(result.userID);
   });
 
   it('keeps compatibility with nickname on registration', async () => {
     const result = await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       nickname: '艾丽丝',
       password: 'password123',
     });
@@ -105,17 +105,17 @@ describe('AuthService', () => {
     expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, '艾丽丝');
   });
 
-  it('rejects duplicate usernames', async () => {
-    users.set('alice', {
+  it('rejects duplicate phoneNumbers', async () => {
+    users.set('13800138000', {
       userID: 'existing-id',
-      username: 'alice',
+      phoneNumber: '13800138000',
       passwordHash: '$argon2id$invalid',
       status: 'active',
     });
 
     await expect(
       service.register({
-        username: 'alice',
+        phoneNumber: '13800138000',
         nickname: '艾丽丝',
         password: 'password123',
       }),
@@ -128,32 +128,32 @@ describe('AuthService', () => {
 
     await expect(
       service.register({
-        username: 'alice',
+        phoneNumber: '13800138000',
         nickname: '艾丽丝',
         password: 'password123',
       }),
     ).rejects.toThrow('OpenIM unavailable');
 
     expect(repository.deletePending).toHaveBeenCalled();
-    expect(users.has('alice')).toBe(false);
+    expect(users.has('13800138000')).toBe(false);
   });
 
   it('returns an OpenIM token after password verification', async () => {
     await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       nickname: '艾丽丝',
       password: 'password123',
     });
 
     await expect(
       service.login({
-        username: 'alice',
+        phoneNumber: '13800138000',
         password: 'password123',
         platformID: 5,
       }),
     ).resolves.toEqual(
       expect.objectContaining({
-        username: 'alice',
+        phoneNumber: '13800138000',
         token: 'user-token',
         expireTimeSeconds: 3600,
       }),
@@ -163,14 +163,14 @@ describe('AuthService', () => {
 
   it('rejects an incorrect password', async () => {
     await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       nickname: '艾丽丝',
       password: 'password123',
     });
 
     await expect(
       service.login({
-        username: 'alice',
+        phoneNumber: '13800138000',
         password: 'incorrect-password',
         platformID: 5,
       }),
@@ -179,20 +179,20 @@ describe('AuthService', () => {
 
   it('changes the password after verifying the old password', async () => {
     await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       nickname: '艾丽丝',
       password: 'password123',
     });
 
     await expect(
       service.changePassword({
-        username: 'alice',
+        phoneNumber: '13800138000',
         oldPassword: 'password123',
         newPassword: 'new-password123',
       }),
     ).resolves.toEqual({
       userID: expect.any(String),
-      username: 'alice',
+      phoneNumber: '13800138000',
     });
     expect(repository.updatePasswordHash).toHaveBeenCalledWith(
       expect.any(String),
@@ -200,23 +200,23 @@ describe('AuthService', () => {
     );
     await expect(
       service.login({
-        username: 'alice',
+        phoneNumber: '13800138000',
         password: 'new-password123',
         platformID: 5,
       }),
-    ).resolves.toEqual(expect.objectContaining({ username: 'alice' }));
+    ).resolves.toEqual(expect.objectContaining({ phoneNumber: '13800138000' }));
   });
 
   it('rejects password changes when the old password is incorrect', async () => {
     await service.register({
-      username: 'alice',
+      phoneNumber: '13800138000',
       nickname: '艾丽丝',
       password: 'password123',
     });
 
     await expect(
       service.changePassword({
-        username: 'alice',
+        phoneNumber: '13800138000',
         oldPassword: 'incorrect-password',
         newPassword: 'new-password123',
       }),
@@ -224,22 +224,22 @@ describe('AuthService', () => {
     expect(repository.updatePasswordHash).not.toHaveBeenCalled();
   });
 
-  it('finds a userID by exact username', async () => {
-    users.set('alice', {
+  it('finds a userID by exact phoneNumber', async () => {
+    users.set('13800138000', {
       userID: '1234567890',
-      username: 'alice',
+      phoneNumber: '13800138000',
       passwordHash: '$argon2id$invalid',
       status: 'active',
     });
 
-    await expect(service.findUserIDByUsername('alice')).resolves.toEqual({
+    await expect(service.findUserIDByPhoneNumber('13800138000')).resolves.toEqual({
       userID: '1234567890',
-      username: 'alice',
+      phoneNumber: '13800138000',
     });
   });
 
-  it('rejects missing users when searching by username', async () => {
-    await expect(service.findUserIDByUsername('alice')).rejects.toBeInstanceOf(
+  it('rejects missing users when searching by phoneNumber', async () => {
+    await expect(service.findUserIDByPhoneNumber('13800138000')).rejects.toBeInstanceOf(
       NotFoundException,
     );
   });

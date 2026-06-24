@@ -21,14 +21,14 @@ type Props = {
   onRegister: (credentials: AuthCredentials) => Promise<void>;
 };
 
-const usernameValid = (username: string) =>
-  username.length >= 6 && username.length <= 32;
+const phoneNumberValid = (phoneNumber: string) =>
+  /^1[3-9]\d{9}$/.test(phoneNumber);
 
-const passwordValid = (password: string) => password.length >= 10;
+const passwordValid = (password: string) => password.length >= 6;
 
 export function LoginScreen({ busy, onLogin, onRegister }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const actionText = mode === 'login' ? '登录' : '注册并登录';
@@ -37,13 +37,13 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
     setConfirmPassword('');
   };
   const submit = () => {
-    const nextUsername = username.trim();
-    if (!usernameValid(nextUsername)) {
-      showToast('用户名需 6-32 位');
+    const nextPhoneNumber = phoneNumber.trim();
+    if (!phoneNumberValid(nextPhoneNumber)) {
+      showToast('请输入正确的手机号码');
       return;
     }
     if (!passwordValid(password)) {
-      showToast('密码至少 10 位');
+      showToast('密码至少 6 位');
       return;
     }
     if (mode === 'register' && password !== confirmPassword) {
@@ -51,7 +51,7 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
       return;
     }
     const credentials = {
-      username: nextUsername,
+      phoneNumber: nextPhoneNumber,
       password,
     };
     return mode === 'login' ? onLogin(credentials) : onRegister(credentials);
@@ -110,10 +110,11 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
             </Pressable>
           </View>
           <FormField
-            label="用户名"
-            onChangeText={setUsername}
-            placeholder="请输入用户名"
-            value={username}
+            keyboardType="phone-pad"
+            label="手机号"
+            onChangeText={setPhoneNumber}
+            placeholder="请输入手机号码"
+            value={phoneNumber}
           />
           <FormField
             label="密码"

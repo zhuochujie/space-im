@@ -1,5 +1,11 @@
 import React from 'react';
-import {StyleSheet, Text, TextInput, View} from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  type KeyboardTypeOptions,
+  View,
+} from 'react-native';
 
 import {colors} from '../theme/colors';
 
@@ -8,6 +14,7 @@ type Props = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  keyboardType?: KeyboardTypeOptions;
   secureTextEntry?: boolean;
 };
 
@@ -16,6 +23,7 @@ export function FormField({
   value,
   onChangeText,
   placeholder,
+  keyboardType,
   secureTextEntry,
 }: Props) {
   return (
@@ -24,6 +32,7 @@ export function FormField({
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
+        keyboardType={keyboardType}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor="#A4ADBC"

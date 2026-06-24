@@ -1,6 +1,7 @@
 import React from 'react';
-import {Image, type ImageStyle, StyleSheet, Text, View} from 'react-native';
+import { type ImageStyle, StyleSheet, Text, View } from 'react-native';
 
+import { CachedImage } from './CachedImage';
 import {colors} from '../theme/colors';
 
 type Props = {
@@ -17,7 +18,13 @@ export function Avatar({name, uri, size = 48}: Props) {
     borderRadius: size * 0.28,
   };
   if (imageUri) {
-    return <Image source={{uri: imageUri}} style={[styles.image, dynamicStyle]} />;
+    return (
+      <CachedImage
+        resizeMode="cover"
+        style={[styles.image, dynamicStyle]}
+        uri={imageUri}
+      />
+    );
   }
   return (
     <View style={[styles.fallback, dynamicStyle]}>

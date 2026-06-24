@@ -14,20 +14,20 @@ export class UsersRepository {
     private readonly userModel: Model<UserDocument>,
   ) {}
 
-  async findByUsername(username: string): Promise<User | null> {
+  async findByPhoneNumber(phoneNumber: string): Promise<User | null> {
     return this.userModel
-      .findOne({ username, status: 'active' })
+      .findOne({ phoneNumber, status: 'active' })
       .lean<User>()
       .exec();
   }
 
-  async reserve(user: Pick<User, 'userID' | 'username' | 'passwordHash'>) {
+  async reserve(user: Pick<User, 'userID' | 'phoneNumber' | 'passwordHash'>) {
     try {
       await this.userModel.create({ ...user, status: 'pending' });
     } catch (error) {
       if (this.isDuplicateKeyError(error)) {
-        if (this.isDuplicateUsernameError(error)) {
-          throw new ConflictException('用户名已存在');
+        if (this.isDuplicatePhoneNumberError(error)) {
+          throw new ConflictException('手机号已注册');
         }
         throw error;
       }
@@ -88,14 +88,14 @@ export class UsersRepository {
     );
   }
 
-  private isDuplicateUsernameError(error: unknown): boolean {
+  private isDuplicatePhoneNumberError(error: unknown): boolean {
     return (
       typeof error === 'object' &&
       error !== null &&
       'keyPattern' in error &&
       typeof error.keyPattern === 'object' &&
       error.keyPattern !== null &&
-      'username' in error.keyPattern
+      'phoneNumber' in error.keyPattern
     );
   }
 }
