@@ -12,8 +12,8 @@ import type { PageProps } from '../types'
 const EMPTY_FILTERS = {
   sendID: '',
   recvID: '',
-  groupID: '',
-  keyword: '',
+  sessionType: '1',
+  contentType: '',
   count: '50',
 }
 
@@ -78,15 +78,19 @@ export function MessagesPage({
           placeholder="接收者 userID"
         />
         <input
-          value={filters.groupID}
-          onChange={(event) => updateFilter('groupID', event.target.value)}
-          placeholder="群 ID"
+          value={filters.contentType}
+          onChange={(event) => updateFilter('contentType', event.target.value)}
+          type="number"
+          min="0"
+          placeholder="消息类型"
         />
-        <input
-          value={filters.keyword}
-          onChange={(event) => updateFilter('keyword', event.target.value)}
-          placeholder="关键词"
-        />
+        <select
+          value={filters.sessionType}
+          onChange={(event) => updateFilter('sessionType', event.target.value)}
+        >
+          <option value="1">单聊</option>
+          <option value="3">群聊</option>
+        </select>
         <input
           value={filters.count}
           onChange={(event) => updateFilter('count', event.target.value)}
@@ -108,7 +112,7 @@ export function MessagesPage({
           </span>
           {total !== null && total > 0 && rows.length === 0 && (
             <span className="muted">
-              OpenIM 返回了总数，但当前页没有聊天记录，请调整分页或筛选条件后重试
+              OpenIM 返回了总数，但当前页没有聊天记录，请调整筛选条件后重试
             </span>
           )}
         </div>

@@ -301,14 +301,15 @@ Authorization: Bearer <token>
 ## 管理员：查询聊天记录
 
 ```http
-GET /admin/messages?sendID=1234567890&recvID=0987654321&keyword=hello&count=50
+GET /admin/messages?sendID=1234567890&recvID=0987654321&sessionType=1&count=50
 Authorization: Bearer <token>
 ```
 
-查询参数会透传到 OpenIM 消息查询接口。默认 OpenIM 路径为 `/msg/search_msg`，
-如当前 OpenIM 版本路径不同，可通过 `OPENIM_MESSAGE_SEARCH_PATH` 覆盖。
-服务端会同时发送 `page/count`、`pageNumber/showNumber` 和 `pagination`，兼容不同
-OpenIM 版本的分页字段。OpenIM 常见返回字段为 `chatLogs` 和 `chatLogsNum`。
+查询参数会映射到 OpenIM 消息查询接口。默认 OpenIM 路径为 `/msg/search_msg`，
+如当前 OpenIM 版本路径不同，可通过 `OPENIM_MESSAGE_SEARCH_PATH` 覆盖。当前支持
+`sendID`、`recvID`、`contentType`、`sessionType`、`page`、`count`。
+`sessionType` 默认是 `1`（单聊），`3` 表示群聊。OpenIM 常见返回字段为 `chatLogs`
+和 `chatLogsNum`。
 
 ## App 更新：查询安卓最新版本
 

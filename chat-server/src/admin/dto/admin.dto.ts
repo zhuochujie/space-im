@@ -76,27 +76,17 @@ export class SearchMessagesDto {
   @IsString({ message: 'recvID 必须是字符串' })
   recvID?: string;
 
-  @Transform(({ value }: { value: unknown }) => trim(value))
+  @Type(() => Number)
   @IsOptional()
-  @IsString({ message: 'groupID 必须是字符串' })
-  groupID?: string;
-
-  @Transform(({ value }: { value: unknown }) => trim(value))
-  @IsOptional()
-  @IsString({ message: '关键词必须是字符串' })
-  keyword?: string;
+  @IsInt({ message: 'contentType 必须是整数' })
+  @Min(0, { message: 'contentType 不能小于 0' })
+  contentType?: number;
 
   @Type(() => Number)
   @IsOptional()
-  @IsInt({ message: 'startTime 必须是整数' })
-  @Min(0, { message: 'startTime 不能小于 0' })
-  startTime?: number;
-
-  @Type(() => Number)
-  @IsOptional()
-  @IsInt({ message: 'endTime 必须是整数' })
-  @Min(0, { message: 'endTime 不能小于 0' })
-  endTime?: number;
+  @IsInt({ message: 'sessionType 必须是整数' })
+  @IsIn([1, 3], { message: 'sessionType 只能是 1 或 3' })
+  sessionType = 1;
 
   @Type(() => Number)
   @IsOptional()

@@ -43,16 +43,8 @@ export class AdminService {
     const body = removeEmptyValues({
       sendID: query.sendID,
       recvID: query.recvID,
-      groupID: query.groupID,
-      keyword: query.keyword,
-      startTime: query.startTime,
-      endTime: query.endTime,
-      startSendTime: query.startTime,
-      endSendTime: query.endTime,
-      page,
-      count,
-      pageNumber: page,
-      showNumber: count,
+      contentType: query.contentType,
+      sessionType: query.sessionType ?? 1,
       pagination: {
         pageNumber: page,
         showNumber: count,
