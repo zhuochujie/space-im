@@ -128,6 +128,22 @@
   grid-template-columns: repeat(5, minmax(120px, 1fr)) 96px;
 }
 
+.resultSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: -4px 0 18px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.muted {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 label {
   display: grid;
   gap: 6px;

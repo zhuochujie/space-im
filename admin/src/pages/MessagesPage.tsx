@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getErrorMessage } from '../lib/errors'
 import { formatMessageTime } from '../lib/format'
-import { extractMessages, previewContent } from '../lib/messages'
+import {
+  extractMessages,
+  extractMessageTotal,
+  previewContent,
+} from '../lib/messages'
 import type { PageProps } from '../types'
 
 const EMPTY_FILTERS = {
@@ -23,6 +27,8 @@ export function MessagesPage({
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [rawResult, setRawResult] = useState<unknown>(null)
   const rows = useMemo(() => extractMessages(rawResult), [rawResult])
+  const total = useMemo(() => extractMessageTotal(rawResult), [rawResult])
+  const hasSearched = rawResult !== null
 
   async function searchMessages(event: FormEvent) {
     event.preventDefault()
@@ -93,6 +99,20 @@ export function MessagesPage({
           查询
         </button>
       </form>
+
+      {hasSearched && (
+        <div className="resultSummary">
+          <span>
+            {total === null ? '当前显示' : `共 ${total} 条，当前显示`}{' '}
+            {rows.length} 条
+          </span>
+          {total !== null && total > 0 && rows.length === 0 && (
+            <span className="muted">
+              OpenIM 返回了总数，但当前页没有聊天记录，请调整分页或筛选条件后重试
+            </span>
+          )}
+        </div>
+      )}
 
       {rows.length > 0 && (
         <div className="tableWrap">

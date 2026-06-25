@@ -307,6 +307,8 @@ Authorization: Bearer <token>
 
 查询参数会透传到 OpenIM 消息查询接口。默认 OpenIM 路径为 `/msg/search_msg`，
 如当前 OpenIM 版本路径不同，可通过 `OPENIM_MESSAGE_SEARCH_PATH` 覆盖。
+服务端会同时发送 `page/count`、`pageNumber/showNumber` 和 `pagination`，兼容不同
+OpenIM 版本的分页字段。OpenIM 常见返回字段为 `chatLogs` 和 `chatLogsNum`。
 
 ## App 更新：查询安卓最新版本
 

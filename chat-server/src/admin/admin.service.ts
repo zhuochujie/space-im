@@ -38,6 +38,8 @@ export class AdminService {
   }
 
   searchMessages(query: SearchMessagesDto) {
+    const page = query.page ?? 1;
+    const count = query.count ?? 50;
     const body = removeEmptyValues({
       sendID: query.sendID,
       recvID: query.recvID,
@@ -45,8 +47,16 @@ export class AdminService {
       keyword: query.keyword,
       startTime: query.startTime,
       endTime: query.endTime,
-      page: query.page ?? 1,
-      count: query.count ?? 50,
+      startSendTime: query.startTime,
+      endSendTime: query.endTime,
+      page,
+      count,
+      pageNumber: page,
+      showNumber: count,
+      pagination: {
+        pageNumber: page,
+        showNumber: count,
+      },
     });
     return this.openImService.searchMessages(body);
   }

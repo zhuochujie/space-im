@@ -9,6 +9,7 @@ export function extractMessages(value: unknown): MessageRow[] {
   }
   const record = value as Record<string, unknown>
   const candidates = [
+    record.chatLogs,
     record.messages,
     record.messageList,
     record.msgs,
@@ -24,12 +25,26 @@ export function extractMessages(value: unknown): MessageRow[] {
   return []
 }
 
+export function extractMessageTotal(value: unknown): number | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+  const record = value as Record<string, unknown>
+  const total =
+    record.chatLogsNum ??
+    record.total ??
+    record.totalCount ??
+    record.count ??
+    record.messageCount
+  return typeof total === 'number' && Number.isFinite(total) ? total : null
+}
+
 export function previewContent(content: unknown): string {
   if (!content) {
     return '-'
   }
   if (typeof content === 'string') {
-    return content
+    return previewStringContent(content)
   }
   if (typeof content !== 'object') {
     return String(content)
@@ -40,6 +55,14 @@ export function previewContent(content: unknown): string {
     return text
   }
   return JSON.stringify(content)
+}
+
+function previewStringContent(content: string): string {
+  try {
+    return previewContent(JSON.parse(content))
+  } catch {
+    return content
+  }
 }
 
 function isMessageRow(value: unknown): value is MessageRow {
