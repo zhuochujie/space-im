@@ -81,14 +81,14 @@ Content-Type: application/json
 
 ```json
 {
-  "phoneNumber": "13800138000",
+  "phoneNumber": "18888888888",
   "password": "password123"
 }
 ```
 
 `platformID` 不需要在注册时传入。注册成功后，服务会在 MongoDB 保存 Argon2id
 密码哈希，并把用户同步注册到 OpenIM。由于 OpenIM 注册用户时昵称不能为空，
-未传昵称时会先使用手机号作为临时昵称，客户端登录后会引导用户设置正式昵称。
+未传昵称时会使用手机号作为默认昵称。
 
 请求示例：
 
@@ -221,6 +221,134 @@ curl 'http://localhost:3000/auth/users/by-phone-number?phoneNumber=13800138000'
   "path": "/auth/users/by-phone-number?phoneNumber=13800138000"
 }
 ```
+
+## 管理员：登录后台
+
+```http
+POST /admin/auth/login
+Content-Type: application/json
+```
+
+请求体：
+
+```json
+{
+  "phoneNumber": "13800138000",
+  "password": "password123"
+}
+```
+
+只有用户表中 `isAdmin=true` 且 `status=active` 的用户可以登录后台。Docker
+部署时可通过 `SPACE_ADMIN_PHONE_NUMBER` 和 `SPACE_ADMIN_PASSWORD` 初始化一个
+管理员账号。
+
+成功响应中的 `token` 用于访问其他 `/admin/*` 接口：
+
+```http
+Authorization: Bearer <token>
+```
+
+## 管理员：用户列表
+
+```http
+GET /admin/users?search=138&status=active&offset=0&count=50
+Authorization: Bearer <token>
+```
+
+查询参数：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `search` | string | 可选，按手机号或 userID 模糊搜索 |
+| `status` | string | 可选，`pending`、`active`、`disabled` |
+| `offset` | number | 可选，默认 `0` |
+| `count` | number | 可选，默认 `50`，最大 `100` |
+
+## 管理员：重置用户密码
+
+```http
+POST /admin/users/1234567890/reset-password
+Content-Type: application/json
+Authorization: Bearer <token>
+```
+
+请求体：
+
+```json
+{
+  "newPassword": "new-password123"
+}
+```
+
+## 管理员：禁用 / 启用用户登录
+
+```http
+POST /admin/users/1234567890/status
+Content-Type: application/json
+Authorization: Bearer <token>
+```
+
+请求体：
+
+```json
+{
+  "status": "disabled"
+}
+```
+
+`status` 只能传 `active` 或 `disabled`。登录接口只允许 `active` 用户登录。
+
+## 管理员：查询聊天记录
+
+```http
+GET /admin/messages?sendID=1234567890&recvID=0987654321&keyword=hello&count=50
+Authorization: Bearer <token>
+```
+
+查询参数会透传到 OpenIM 消息查询接口。默认 OpenIM 路径为 `/msg/search_msg`，
+如当前 OpenIM 版本路径不同，可通过 `OPENIM_MESSAGE_SEARCH_PATH` 覆盖。
+
+## App 更新：查询安卓最新版本
+
+```http
+GET /app-update/android/latest
+```
+
+未上传安装包时 `data` 为 `null`。上传后返回：
+
+```json
+{
+  "platform": "android",
+  "versionCode": 2,
+  "versionName": "1.0.1",
+  "forceUpdate": false,
+  "releaseNotes": "修复已知问题",
+  "fileSize": 42000000,
+  "sha256": "apk sha256",
+  "apkUrl": "http://localhost:3000/app-update/android/download",
+  "updatedAt": "2026-06-25T10:00:00.000Z"
+}
+```
+
+## App 更新：下载安卓最新安装包
+
+```http
+GET /app-update/android/download
+```
+
+返回最新 APK 文件。
+
+## 管理员：上传安卓最新安装包
+
+```http
+PUT /admin/app-update/android?versionCode=2&versionName=1.0.1&forceUpdate=false&releaseNotes=修复已知问题
+Content-Type: application/vnd.android.package-archive
+Authorization: Bearer <token>
+
+<APK binary>
+```
+
+服务器只保存最新一个 APK。上传成功后会覆盖旧 APK，并更新版本元信息。
 
 找不到用户：
 

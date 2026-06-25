@@ -415,6 +415,10 @@ services:
       - "${SPACE_CHAT_SERVER_PORT:-3000}:3000"
     environment:
       - PORT=3000
+      - ADMIN_SESSION_SECRET=${SPACE_ADMIN_SESSION_SECRET:-change-me}
+      - SPACE_ADMIN_PHONE_NUMBER=${SPACE_ADMIN_PHONE_NUMBER:-18888888888}
+      - SPACE_ADMIN_PASSWORD=${SPACE_ADMIN_PASSWORD:-password123}
+      - APP_UPDATE_STORAGE_DIR=${APP_UPDATE_STORAGE_DIR:-/app/storage}
       - MONGODB_URI=mongodb://mongo:27017
       - MONGODB_DATABASE=${SPACE_CHAT_MONGODB_DATABASE:-chat_server}
       - MONGO_USERNAME=${SPACE_CHAT_MONGO_USERNAME:-chatService}
@@ -423,6 +427,7 @@ services:
       - OPENIM_API_URL=${SPACE_CHAT_OPENIM_API_URL:-http://openim-server:10002}
       - OPENIM_SECRET=${OPENIM_SECRET}
       - OPENIM_ADMIN_USER_ID=${SPACE_CHAT_OPENIM_ADMIN_USER_ID:-imAdmin}
+      - OPENIM_MESSAGE_SEARCH_PATH=${SPACE_CHAT_OPENIM_MESSAGE_SEARCH_PATH:-/msg/search_msg}
     healthcheck:
       test:
         [
@@ -436,8 +441,24 @@ services:
     depends_on:
       - mongo
       - openim-server
+    volumes:
+      - ${DATA_DIR}/components/chat-server/storage:/app/storage
     networks:
       - openim
+
+  space-admin:
+    build:
+      context: ../admin
+    image: ${SPACE_ADMIN_IMAGE:-space-im-admin:latest}
+    container_name: space-admin
+    init: true
+    ports:
+      - "${SPACE_ADMIN_PORT:-18080}:80"
+    depends_on:
+      - chat-server
+    networks:
+      - openim
+    restart: always
 
   # openim-chat:
   #   image: ${OPENIM_CHAT_IMAGE}

@@ -5,13 +5,13 @@
 ## 已实现
 
 - OpenIM Server API / WebSocket 地址配置
-- 用户名 + 密码注册和登录
+- 手机号 + 密码注册和登录
 - 自动获取 `userID` 和 OpenIM `token`
 - 本地保存会话，重新打开 App 时自动登录
 - SDK 初始化、前后台状态同步和连接状态监听
 - 会话列表、未读数和实时会话更新
 - 好友与已加入群组列表
-- 通过用户名发送好友申请、申请加入群聊
+- 通过手机号发送好友申请、申请加入群聊
 - 查看收到的好友申请，并通过或拒绝
 - 创建群聊并选择初始好友成员
 - 单聊好友设置、修改备注和删除好友
@@ -71,4 +71,4 @@ iOS `NSAllowsArbitraryLoads`。
 
 ## 接口文档
 
-- [OpenIM API](docs/api.md)
+- [Chat Server API](../chat-server/docs/api.md)

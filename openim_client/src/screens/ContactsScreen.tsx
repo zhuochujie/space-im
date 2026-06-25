@@ -19,6 +19,7 @@ import type {
 
 import { Avatar } from '../components/Avatar';
 import { EmptyState } from '../components/EmptyState';
+import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
 import { showConfirm } from '../utils/toast';
 
@@ -260,7 +261,10 @@ export function ContactsScreen({
         transparent
         visible={actionVisible}
       >
-        <Pressable onPress={closeAction} style={styles.modalBackdrop}>
+        <KeyboardCenteredModal
+          onPress={closeAction}
+          style={styles.modalBackdrop}
+        >
           <Pressable onPress={() => undefined} style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               {action === 'friend'
@@ -368,7 +372,7 @@ export function ContactsScreen({
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </KeyboardCenteredModal>
       </Modal>
     </View>
   );
@@ -738,8 +742,6 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
     backgroundColor: 'rgba(23, 32, 51, 0.45)',
   },
   modalCard: {

@@ -39,6 +39,12 @@ export class OpenImService {
     );
   }
 
+  async searchMessages(body: Record<string, unknown>): Promise<unknown> {
+    const token = await this.getAdminToken();
+    const path = process.env.OPENIM_MESSAGE_SEARCH_PATH ?? '/msg/search_msg';
+    return this.request<unknown>(path, body, token);
+  }
+
   private async getAdminToken(): Promise<string> {
     if (this.adminToken && this.adminToken.expiresAt > Date.now() + 60_000) {
       return this.adminToken.token;
@@ -106,10 +112,7 @@ export class OpenImService {
         `OpenIM 请求失败 (${path}, errCode=${result.errCode ?? response.status}): ${detail || response.statusText}`,
       );
     }
-    if (
-      result.data === undefined &&
-      path !== '/user/user_register'
-    ) {
+    if (result.data === undefined && path !== '/user/user_register') {
       throw new BadGatewayException('OpenIM 响应缺少 data');
     }
 

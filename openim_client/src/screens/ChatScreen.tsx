@@ -50,6 +50,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../components/Avatar';
 import { CachedImage } from '../components/CachedImage';
 import { EmptyState } from '../components/EmptyState';
+import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
 import type { ChatTarget } from '../types/app';
 import { copyMessageText } from '../utils/clipboard';
@@ -209,10 +210,6 @@ export function ChatScreen({
   const selectedMemberFriend = selectedMember
     ? friends.find(item => item.userID === selectedMember.userID)
     : undefined;
-  const canAddSelectedMember =
-    Boolean(selectedMember) &&
-    selectedMember?.userID !== selfUserID &&
-    !selectedMemberFriend;
   const inviteCandidates = useMemo(() => {
     const memberUserIDs = new Set(groupMembers.map(member => member.userID));
     return friends.filter(item => !memberUserIDs.has(item.userID));
@@ -996,22 +993,6 @@ export function ChatScreen({
       const succeeded = await onAddFriend(target.userID, target.title);
       if (succeeded) {
         setSettingsVisible(false);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addSelectedMemberFriend = async () => {
-    if (!selectedMember || saving || selectedMemberFriend) {
-      return;
-    }
-    setSaving(true);
-    try {
-      const title = selectedMember.nickname || selectedMember.userID;
-      const succeeded = await onAddFriend(selectedMember.userID, title);
-      if (succeeded) {
-        closeMemberDetails();
       }
     } finally {
       setSaving(false);
@@ -2193,7 +2174,10 @@ export function ChatScreen({
         transparent
         visible={remarkModalVisible}
       >
-        <Pressable onPress={closeRemarkModal} style={styles.remarkBackdrop}>
+        <KeyboardCenteredModal
+          onPress={closeRemarkModal}
+          style={styles.remarkBackdrop}
+        >
           <Pressable onPress={() => undefined} style={styles.remarkCard}>
             <View style={styles.remarkHeader}>
               <Text style={styles.remarkTitle}>修改备注</Text>
@@ -2245,7 +2229,7 @@ export function ChatScreen({
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </KeyboardCenteredModal>
       </Modal>
       <Modal
         animationType="fade"
@@ -2253,7 +2237,10 @@ export function ChatScreen({
         transparent
         visible={groupInfoModalVisible}
       >
-        <Pressable onPress={closeGroupInfoModal} style={styles.remarkBackdrop}>
+        <KeyboardCenteredModal
+          onPress={closeGroupInfoModal}
+          style={styles.remarkBackdrop}
+        >
           <Pressable onPress={() => undefined} style={styles.remarkCard}>
             <View style={styles.remarkHeader}>
               <Text style={styles.remarkTitle}>编辑群资料</Text>
@@ -2323,7 +2310,7 @@ export function ChatScreen({
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </KeyboardCenteredModal>
       </Modal>
       <Modal
         animationType="fade"
@@ -2502,23 +2489,6 @@ export function ChatScreen({
                         : '未添加'}
                   </Text>
                 </View>
-                {canAddSelectedMember && (
-                  <Pressable
-                    disabled={saving || kickConfirmationVisible}
-                    onPress={addSelectedMemberFriend}
-                    style={[
-                      styles.memberActionButton,
-                      (saving || kickConfirmationVisible) &&
-                        styles.modalButtonDisabled,
-                    ]}
-                  >
-                    {saving && !kickConfirmationVisible ? (
-                      <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                      <Text style={styles.modalButtonText}>添加好友</Text>
-                    )}
-                  </Pressable>
-                )}
                 {canManageSelectedMemberRole && (
                   <Pressable
                     disabled={saving || kickConfirmationVisible}
@@ -3270,8 +3240,6 @@ const styles = StyleSheet.create({
   },
   remarkBackdrop: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
     backgroundColor: 'rgba(23, 32, 51, 0.45)',
   },
   remarkCard: {

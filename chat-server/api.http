@@ -1,7 +1,9 @@
 @baseUrl = http://localhost:3000
-@username = alice
+@phoneNumber = 13800138000
 @password = password123
 @platformID = 5
+@userID = 1234567890
+@adminToken = paste-admin-token-here
 
 ### 健康检查
 GET {{baseUrl}}
@@ -12,7 +14,7 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "username": "{{username}}",
+  "phoneNumber": "{{phoneNumber}}",
   "password": "{{password}}"
 }
 
@@ -21,21 +23,21 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "{{username}}",
+  "phoneNumber": "{{phoneNumber}}",
   "password": "{{password}}",
   "platformID": {{platformID}}
 }
 
-### 通过用户名精确搜索 userID
-GET {{baseUrl}}/auth/users/by-username?username={{username}}
+### 通过手机号精确搜索 userID
+GET {{baseUrl}}/auth/users/by-phone-number?phoneNumber={{phoneNumber}}
 Accept: application/json
 
-### 注册重复用户名，预期返回 409
+### 注册重复手机号，预期返回 409
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "username": "{{username}}",
+  "phoneNumber": "{{phoneNumber}}",
   "password": "{{password}}"
 }
 
@@ -44,7 +46,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "{{username}}",
+  "phoneNumber": "{{phoneNumber}}",
   "password": "incorrect-password",
   "platformID": {{platformID}}
 }
@@ -54,7 +56,7 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "{{username}}",
+  "phoneNumber": "{{phoneNumber}}",
   "password": "{{password}}"
 }
 
@@ -63,6 +65,68 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "username": "a",
+  "phoneNumber": "123",
   "password": "short"
 }
+
+### 管理员：用户列表
+### 先执行后台登录，把返回 data.token 填到 @adminToken
+POST {{baseUrl}}/admin/auth/login
+Content-Type: application/json
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "password": "{{password}}"
+}
+
+### 管理员：用户列表
+GET {{baseUrl}}/admin/users?search={{phoneNumber}}&offset=0&count=50
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### 管理员：重置用户密码
+POST {{baseUrl}}/admin/users/{{userID}}/reset-password
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "newPassword": "new-password123"
+}
+
+### 管理员：禁用用户登录
+POST {{baseUrl}}/admin/users/{{userID}}/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "status": "disabled"
+}
+
+### 管理员：启用用户登录
+POST {{baseUrl}}/admin/users/{{userID}}/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "status": "active"
+}
+
+### 管理员：查询聊天记录
+GET {{baseUrl}}/admin/messages?sendID={{userID}}&count=50
+Accept: application/json
+Authorization: Bearer {{adminToken}}
+
+### App 更新：查询安卓最新版本
+GET {{baseUrl}}/app-update/android/latest
+Accept: application/json
+
+### App 更新：下载安卓最新安装包
+GET {{baseUrl}}/app-update/android/download
+
+### 管理员：上传安卓最新安装包
+### 将 ./app-release.apk 替换成本地 APK 路径
+PUT {{baseUrl}}/admin/app-update/android?versionCode=2&versionName=1.0.1&forceUpdate=false&releaseNotes=修复已知问题
+Content-Type: application/vnd.android.package-archive
+Authorization: Bearer {{adminToken}}
+
+< ./app-release.apk

@@ -28,7 +28,9 @@ describe('AuthService', () => {
     repository = {
       findByPhoneNumber: jest.fn((phoneNumber: string) =>
         Promise.resolve(
-          users.get(phoneNumber)?.status === 'active' ? users.get(phoneNumber) : null,
+          users.get(phoneNumber)?.status === 'active'
+            ? users.get(phoneNumber)
+            : null,
         ),
       ),
       reserve: jest.fn((user) => {
@@ -87,7 +89,10 @@ describe('AuthService', () => {
 
     expect(result.phoneNumber).toBe('13800138000');
     expect(result.userID).toMatch(/^\d{10}$/);
-    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, '13800138000');
+    expect(openIm.registerUser).toHaveBeenCalledWith(
+      result.userID,
+      '13800138000',
+    );
     const storedUser = repository.reserve.mock.calls[0][0];
     expect(storedUser.userID).toBe(result.userID);
     expect(storedUser.phoneNumber).toBe('13800138000');
@@ -184,16 +189,13 @@ describe('AuthService', () => {
       password: 'password123',
     });
 
-    await expect(
-      service.changePassword({
-        phoneNumber: '13800138000',
-        oldPassword: 'password123',
-        newPassword: 'new-password123',
-      }),
-    ).resolves.toEqual({
-      userID: expect.any(String),
+    const changedUser = await service.changePassword({
       phoneNumber: '13800138000',
+      oldPassword: 'password123',
+      newPassword: 'new-password123',
     });
+    expect(typeof changedUser.userID).toBe('string');
+    expect(changedUser.phoneNumber).toBe('13800138000');
     expect(repository.updatePasswordHash).toHaveBeenCalledWith(
       expect.any(String),
       expect.stringMatching(/^\$argon2id\$/),
@@ -232,15 +234,17 @@ describe('AuthService', () => {
       status: 'active',
     });
 
-    await expect(service.findUserIDByPhoneNumber('13800138000')).resolves.toEqual({
+    await expect(
+      service.findUserIDByPhoneNumber('13800138000'),
+    ).resolves.toEqual({
       userID: '1234567890',
       phoneNumber: '13800138000',
     });
   });
 
   it('rejects missing users when searching by phoneNumber', async () => {
-    await expect(service.findUserIDByPhoneNumber('13800138000')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.findUserIDByPhoneNumber('13800138000'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

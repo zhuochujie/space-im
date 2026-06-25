@@ -1,59 +1,80 @@
-# OpenIM Docker Usage Instructions 📘
+# SPACE IM Docker Deployment
 
-> **Documentation Resources** 📚
+This directory starts SPACE IM dependencies, OpenIM Server, `chat-server`, and the admin console.
 
-+ [Official Deployment Guide](https://docs.openim.io/guides/gettingstarted/dockercompose)
-
-## :busts_in_silhouette: Community
-
-+ 💬 [Follow us on Twitter](https://twitter.com/founder_im63606)
-+ 🚀 [Join our Slack channel](https://join.slack.com/t/openimsdk/shared_invite/zt-22720d66b-o_FvKxMTGXtcnnnHiMqe9Q)
-+ :eyes: [Join our WeChat Group](https://openim-1253691595.cos.ap-nanjing.myqcloud.com/WechatIMG20.jpeg)
-
-## Environment Preparation 🌍
-
-- Install Docker with the Compose plugin or docker-compose on your server. For installation details, visit [Docker Compose Installation Guide](https://docs.docker.com/compose/install/linux/).
-
-## Repository Cloning 🗂️
+## Quick Start
 
 ```bash
-git clone https://github.com/openimsdk/openim-docker
+cd openim-docker
+cp .env.example .env
 ```
 
-## Configuration Modification 🔧
+Edit at least:
 
-- Modify the `.env` file to configure the external IP. If using a domain name, Nginx configuration is required.
+```env
+SPACE_ADMIN_PASSWORD=change-to-a-strong-password
+SPACE_ADMIN_SESSION_SECRET=change-to-a-long-random-secret
+MINIO_EXTERNAL_ADDRESS=http://your-server-ip-or-domain:10005
+```
 
-  ```plaintext
-  # Set the external access address (IP or domain) for MinIO service
-  MINIO_EXTERNAL_ADDRESS="http://external_ip:10005"
-  ```
-
-- For other configurations, please refer to the comments in the .env file
-
-## Service Launch 🚀
-
-- To start the service:
+Then start everything with the helper script:
 
 ```bash
-docker compose up -d
+./deploy.sh
 ```
 
-- To stop the service:
+Or run Docker Compose directly:
+
+```bash
+docker compose up -d --build
+```
+
+Default admin account:
+
+```text
+Phone: 18888888888
+Password: SPACE_ADMIN_PASSWORD
+```
+
+Default endpoints:
+
+```text
+chat-server: http://server-ip:3000
+SPACE IM admin: http://server-ip:18080
+OpenIM API: http://server-ip:10002
+OpenIM gateway: server-ip:10001
+MinIO: http://server-ip:10005
+```
+
+Android update APK storage:
+
+```text
+openim-docker/components/chat-server/storage/app-updates/android/latest.apk
+```
+
+## Logs
+
+```bash
+docker compose ps
+docker logs -f chat-server
+docker logs -f space-admin
+docker logs -f openim-server
+```
+
+## Update
+
+```bash
+docker compose up -d --build chat-server space-admin
+```
+
+Use this when dependency service configuration changed:
+
+```bash
+docker compose up -d --build
+```
+
+## Stop
 
 ```bash
 docker compose down
 ```
-
-- To view logs:
-
-```bash
-docker logs -f openim-server
-docker logs -f openim-chat
-```
-
-## Quick Experience ⚡
-
-For a quick experience with OpenIM services, please visit the [Quick Test Server Guide](https://docs.openim.io/guides/gettingStarted/quickTestServer).
-```
-

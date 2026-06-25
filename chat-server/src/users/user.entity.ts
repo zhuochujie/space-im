@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
 export type UserDocument = HydratedDocument<User>;
-export type UserStatus = 'pending' | 'active';
+export type UserStatus = 'pending' | 'active' | 'disabled';
 
 @Schema({
   collection: 'chat_server_users',
@@ -19,7 +19,14 @@ export class User {
   @Prop({ required: true })
   passwordHash!: string;
 
-  @Prop({ required: true, enum: ['pending', 'active'], default: 'pending' })
+  @Prop({ required: true, default: false })
+  isAdmin!: boolean;
+
+  @Prop({
+    required: true,
+    enum: ['pending', 'active', 'disabled'],
+    default: 'pending',
+  })
   status!: UserStatus;
 
   createdAt?: Date;

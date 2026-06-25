@@ -45,7 +45,7 @@ describe('AppController (e2e)', () => {
   it('/auth/register validates request body', () => {
     return request(app.getHttpServer())
       .post('/auth/register')
-      .send({ username: 'a', password: 'short', extra: true })
+      .send({ phoneNumber: '123', password: 'short', extra: true })
       .expect(400)
       .expect((response) => {
         const body = response.body as ApiResponseBody<null>;
@@ -62,7 +62,7 @@ describe('AppController (e2e)', () => {
   it('/auth/login requires platformID', () => {
     return request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'alice', password: 'password123' })
+      .send({ phoneNumber: '13800138000', password: 'password123' })
       .expect(400)
       .expect((response) => {
         const body = response.body as ApiResponseBody<null>;

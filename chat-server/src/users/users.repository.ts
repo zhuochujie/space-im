@@ -5,7 +5,17 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { User, UserDocument } from './user.entity';
+import { User, UserDocument, UserStatus } from './user.entity';
+
+interface ListUsersParams {
+  isAdmin?: boolean;
+  search?: string;
+  status?: UserStatus;
+  offset: number;
+  count: number;
+}
+
+type PublicUser = Omit<User, 'passwordHash'>;
 
 @Injectable()
 export class UsersRepository {
@@ -19,6 +29,79 @@ export class UsersRepository {
       .findOne({ phoneNumber, status: 'active' })
       .lean<User>()
       .exec();
+  }
+
+  async findAnyByPhoneNumber(phoneNumber: string): Promise<User | null> {
+    return this.userModel.findOne({ phoneNumber }).lean<User>().exec();
+  }
+
+  async list({
+    isAdmin,
+    search,
+    status,
+    offset,
+    count,
+  }: ListUsersParams): Promise<{ items: PublicUser[]; total: number }> {
+    const filter: Record<string, unknown> = {};
+    if (status) {
+      filter.status = status;
+    }
+    if (typeof isAdmin === 'boolean') {
+      filter.isAdmin = isAdmin;
+    }
+    if (search) {
+      const regex = new RegExp(escapeRegExp(search), 'i');
+      filter.$or = [{ phoneNumber: regex }, { userID: regex }];
+    }
+
+    const [items, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select('-passwordHash')
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(count)
+        .lean<PublicUser[]>()
+        .exec(),
+      this.userModel.countDocuments(filter).exec(),
+    ]);
+    return { items, total };
+  }
+
+  async findByUserID(userID: string): Promise<PublicUser | null> {
+    return this.userModel
+      .findOne({ userID })
+      .select('-passwordHash')
+      .lean<PublicUser>()
+      .exec();
+  }
+
+  async upsertBootstrapAdmin(user: {
+    phoneNumber: string;
+    passwordHash: string;
+    userID: string;
+  }): Promise<void> {
+    try {
+      await this.userModel.updateOne(
+        { phoneNumber: user.phoneNumber },
+        {
+          $set: {
+            passwordHash: user.passwordHash,
+            status: 'active',
+            isAdmin: true,
+          },
+          $setOnInsert: {
+            userID: user.userID,
+            phoneNumber: user.phoneNumber,
+          },
+        },
+        { upsert: true },
+      );
+    } catch (error) {
+      throw new InternalServerErrorException('管理员初始化失败', {
+        cause: error,
+      });
+    }
   }
 
   async reserve(user: Pick<User, 'userID' | 'phoneNumber' | 'passwordHash'>) {
@@ -63,17 +146,41 @@ export class UsersRepository {
     }
   }
 
-  async updatePasswordHash(userID: string, passwordHash: string): Promise<void> {
+  async updatePasswordHash(
+    userID: string,
+    passwordHash: string,
+  ): Promise<void> {
     try {
       const result = await this.userModel.updateOne(
-        { userID, status: 'active' },
+        { userID, status: { $in: ['active', 'disabled'] } },
         { $set: { passwordHash } },
       );
       if (result.matchedCount !== 1) {
-        throw new Error('Active user was not found');
+        throw new Error('User was not found');
       }
     } catch (error) {
       throw new InternalServerErrorException('密码更新失败', {
+        cause: error,
+      });
+    }
+  }
+
+  async setStatus(userID: string, status: 'active' | 'disabled') {
+    try {
+      const user = await this.userModel
+        .findOneAndUpdate(
+          { userID, status: { $in: ['active', 'disabled'] } },
+          { $set: { status } },
+          { new: true, projection: { passwordHash: 0 } },
+        )
+        .lean<PublicUser>()
+        .exec();
+      if (!user) {
+        throw new Error('User was not found');
+      }
+      return user;
+    } catch (error) {
+      throw new InternalServerErrorException('用户状态更新失败', {
         cause: error,
       });
     }
@@ -98,4 +205,8 @@ export class UsersRepository {
       'phoneNumber' in error.keyPattern
     );
   }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

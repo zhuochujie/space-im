@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, Vibration } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  Vibration,
+} from 'react-native';
 import OpenIMSDK, {
   type ConversationItem,
   type FriendApplicationItem,
@@ -43,6 +50,7 @@ type Props = {
     avatarPath?: string;
     nickname: string;
   }) => Promise<boolean>;
+  onCheckUpdate: () => void;
   onLogout: () => void;
 };
 
@@ -70,6 +78,7 @@ export function MainScreen({
   connection,
   onChangeProfile,
   onChangePassword,
+  onCheckUpdate,
   profile,
   phoneNumber,
   onLogout,
@@ -86,9 +95,27 @@ export function MainScreen({
     GroupApplicationItem[]
   >([]);
   const [groups, setGroups] = useState<GroupItem[]>([]);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
   const [refreshingConversations, setRefreshingConversations] = useState(false);
   const [refreshingContacts, setRefreshingContacts] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncReady, setSyncReady] = useState(false);
+  const [conversationsReady, setConversationsReady] = useState(false);
+  const [contactsReady, setContactsReady] = useState(false);
   const notifiedMessageIDs = useRef(new Set<string>());
+  const dataReady = syncReady && conversationsReady && contactsReady;
+  const statusLoading =
+    connection === '连接中' ||
+    syncing ||
+    loadingConversations ||
+    loadingContacts ||
+    (connection === '已连接' && !dataReady);
+  const connectionLabel =
+    connection === '已连接' &&
+    (syncing || loadingConversations || loadingContacts || !dataReady)
+      ? '同步中'
+      : connection;
   const tabBadges = useMemo<Record<MainTab, number>>(
     () => ({
       messages: conversations.reduce(
@@ -146,19 +173,24 @@ export function MainScreen({
   );
 
   const refreshConversations = useCallback(async () => {
+    setLoadingConversations(true);
     try {
       const list = await OpenIMSDK.getAllConversationList();
       setConversations(
         [...list].sort((a, b) => b.latestMsgSendTime - a.latestMsgSendTime),
       );
+      setConversationsReady(true);
     } catch {
       if (connection === '已连接') {
         showToast('会话加载失败');
       }
+    } finally {
+      setLoadingConversations(false);
     }
   }, [connection]);
 
   const refreshContacts = useCallback(async () => {
+    setLoadingContacts(true);
     try {
       const [friendList, groupList, applicationList] = await Promise.all([
         OpenIMSDK.getFriendList(false),
@@ -214,10 +246,13 @@ export function MainScreen({
           (a, b) => (b.reqTime || b.createTime) - (a.reqTime || a.createTime),
         ),
       );
+      setContactsReady(true);
     } catch {
       if (connection === '已连接') {
         showToast('联系人加载失败');
       }
+    } finally {
+      setLoadingContacts(false);
     }
   }, [connection, profile?.userID]);
 
@@ -242,8 +277,21 @@ export function MainScreen({
   useEffect(() => {
     refreshConversations();
     refreshContacts();
-    const syncStarted = () => showToast('同步中');
-    const syncFailed = () => showToast('同步失败');
+    const syncStarted = () => {
+      setSyncReady(false);
+      setSyncing(true);
+    };
+    const syncFailed = () => {
+      setSyncReady(false);
+      setSyncing(false);
+      showToast('同步失败');
+    };
+    const syncFinished = () => {
+      setSyncReady(true);
+      setSyncing(false);
+      refreshConversations();
+      refreshContacts();
+    };
     const receiveOne = (message: MessageItem) =>
       notifyIncomingMessages([message]);
     OpenIMSDK.on(OpenIMEvent.OnConversationChanged, applyConversationChanges);
@@ -252,7 +300,7 @@ export function MainScreen({
     OpenIMSDK.on(OpenIMEvent.OnRecvNewMessage, receiveOne);
     OpenIMSDK.on(OpenIMEvent.OnSyncServerStart, syncStarted);
     OpenIMSDK.on(OpenIMEvent.OnSyncServerFailed, syncFailed);
-    OpenIMSDK.on(OpenIMEvent.OnSyncServerFinish, refreshConversations);
+    OpenIMSDK.on(OpenIMEvent.OnSyncServerFinish, syncFinished);
     OpenIMSDK.on(OpenIMEvent.OnFriendAdded, refreshContacts);
     OpenIMSDK.on(OpenIMEvent.OnFriendDeleted, refreshContacts);
     OpenIMSDK.on(OpenIMEvent.OnFriendInfoChanged, refreshContacts);
@@ -281,7 +329,7 @@ export function MainScreen({
       OpenIMSDK.off(OpenIMEvent.OnRecvNewMessage, receiveOne);
       OpenIMSDK.off(OpenIMEvent.OnSyncServerStart, syncStarted);
       OpenIMSDK.off(OpenIMEvent.OnSyncServerFailed, syncFailed);
-      OpenIMSDK.off(OpenIMEvent.OnSyncServerFinish, refreshConversations);
+      OpenIMSDK.off(OpenIMEvent.OnSyncServerFinish, syncFinished);
       OpenIMSDK.off(OpenIMEvent.OnFriendAdded, refreshContacts);
       OpenIMSDK.off(OpenIMEvent.OnFriendDeleted, refreshContacts);
       OpenIMSDK.off(OpenIMEvent.OnFriendInfoChanged, refreshContacts);
@@ -682,13 +730,21 @@ export function MainScreen({
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{titles[tab]}</Text>
         <View style={styles.connectionPill}>
-          <View
-            style={[
-              styles.connectionDot,
-              connection !== '已连接' && styles.connectionDotOffline,
-            ]}
-          />
-          <Text style={styles.connectionLabel}>{connection}</Text>
+          {statusLoading ? (
+            <ActivityIndicator
+              color={colors.primary}
+              size="small"
+              style={styles.connectionSpinner}
+            />
+          ) : (
+            <View
+              style={[
+                styles.connectionDot,
+                connection !== '已连接' && styles.connectionDotOffline,
+              ]}
+            />
+          )}
+          <Text style={styles.connectionLabel}>{connectionLabel}</Text>
         </View>
       </View>
       <View style={styles.content}>
@@ -737,6 +793,7 @@ export function MainScreen({
           <ProfileScreen
             onChangePassword={onChangePassword}
             onChangeProfile={onChangeProfile}
+            onCheckUpdate={onCheckUpdate}
             onLogout={onLogout}
             profile={profile}
             phoneNumber={phoneNumber}
@@ -811,6 +868,11 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: colors.success,
+    marginRight: 6,
+  },
+  connectionSpinner: {
+    width: 12,
+    height: 12,
     marginRight: 6,
   },
   connectionDotOffline: { backgroundColor: '#E59B32' },

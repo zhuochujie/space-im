@@ -6,18 +6,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomInt } from 'node:crypto';
-import * as argon2 from 'argon2';
 import { OpenImService } from '../openim/openim.service';
 import { UsersRepository } from '../users/users.repository';
 import { ChangePasswordDto, LoginDto, RegisterDto } from './dto/auth.dto';
 import { AuthUser, LoginResponse } from './auth.types';
-
-const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
-  type: argon2.argon2id,
-  memoryCost: 19_456,
-  timeCost: 2,
-  parallelism: 1,
-};
+import { hashPassword, verifyPassword } from './password';
 const MAX_USER_ID_GENERATION_ATTEMPTS = 5;
 
 @Injectable()
@@ -29,7 +22,7 @@ export class AuthService {
 
   async register(request: RegisterDto): Promise<AuthUser> {
     const { phoneNumber, password, nickname } = request;
-    const passwordHash = await this.hashPassword(password);
+    const passwordHash = await hashPassword(password);
     const userID = await this.reserveUser(phoneNumber, passwordHash);
 
     try {
@@ -79,7 +72,7 @@ export class AuthService {
     const { phoneNumber, password, platformID } = request;
     const user = await this.usersRepository.findByPhoneNumber(phoneNumber);
 
-    if (!user || !(await this.verifyPassword(password, user.passwordHash))) {
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
       throw new UnauthorizedException('手机号或密码错误');
     }
 
@@ -109,14 +102,11 @@ export class AuthService {
     const { phoneNumber, oldPassword, newPassword } = request;
     const user = await this.usersRepository.findByPhoneNumber(phoneNumber);
 
-    if (
-      !user ||
-      !(await this.verifyPassword(oldPassword, user.passwordHash))
-    ) {
+    if (!user || !(await verifyPassword(oldPassword, user.passwordHash))) {
       throw new UnauthorizedException('旧密码错误');
     }
 
-    const passwordHash = await this.hashPassword(newPassword);
+    const passwordHash = await hashPassword(newPassword);
     await this.usersRepository.updatePasswordHash(user.userID, passwordHash);
     return {
       userID: user.userID,
@@ -124,22 +114,7 @@ export class AuthService {
     };
   }
 
-  private async hashPassword(password: string): Promise<string> {
-    return argon2.hash(password, ARGON2_OPTIONS);
-  }
-
   private generateUserID(): string {
     return randomInt(1_000_000_000, 10_000_000_000).toString();
-  }
-
-  private async verifyPassword(
-    password: string,
-    storedHash: string,
-  ): Promise<boolean> {
-    try {
-      return await argon2.verify(storedHash, password);
-    } catch {
-      return false;
-    }
   }
 }

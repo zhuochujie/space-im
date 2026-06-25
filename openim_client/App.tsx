@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
+  Platform,
   StatusBar,
   StyleSheet,
   View,
@@ -23,6 +24,7 @@ import {
   loginAccount,
   registerAccount,
 } from './src/services/chatApi';
+import { checkAndroidUpdate } from './src/services/appUpdate';
 import {
   clearSession,
   loadSession,
@@ -71,7 +73,6 @@ function AppContent() {
     const connecting = () => setConnection('连接中');
     const connected = () => {
       setConnection('已连接');
-      showToast('已连接');
     };
     const failed = () => {
       setConnection('连接失败');
@@ -114,6 +115,12 @@ function AppContent() {
       OpenIMSDK.off(OpenIMEvent.OnUserTokenInvalid, offline);
       OpenIMSDK.off(OpenIMEvent.OnSelfInfoUpdated, selfInfoUpdated);
     };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      checkAndroidUpdate(true).catch(() => undefined);
+    }
   }, []);
 
   const ensureSDKInitialized = useCallback(async () => {
@@ -399,6 +406,7 @@ function AppContent() {
       connection={connection}
       onChangePassword={changePassword}
       onChangeProfile={changeProfile}
+      onCheckUpdate={() => checkAndroidUpdate(false)}
       onLogout={logout}
       profile={profile}
       phoneNumber={sessionRef.current?.phoneNumber}

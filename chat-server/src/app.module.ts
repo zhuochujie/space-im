@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { loadEnvFile } from 'node:process';
 import { AppController } from './app.controller';
+import { AppUpdateModule } from './app-update/app-update.module';
+import { AdminModule } from './admin/admin.module';
 import { AuthModule } from './auth/auth.module';
 
 try {
@@ -36,6 +38,8 @@ if (Boolean(mongoUsername) !== Boolean(mongoPassword)) {
         serverSelectionTimeoutMS: 5_000,
       },
     ),
+    AdminModule,
+    AppUpdateModule,
     AuthModule,
   ],
   controllers: [AppController],

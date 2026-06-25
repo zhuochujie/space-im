@@ -13,6 +13,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { launchImageLibrary } from 'react-native-image-picker';
 
 import { Avatar } from '../components/Avatar';
+import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
 import {
   avatarPickerOptions,
@@ -35,6 +36,7 @@ type Props = {
     avatarPath?: string;
     nickname: string;
   }) => Promise<boolean>;
+  onCheckUpdate: () => void;
   onLogout: () => void;
 };
 
@@ -43,6 +45,7 @@ export function ProfileScreen({
   phoneNumber,
   onChangePassword,
   onChangeProfile,
+  onCheckUpdate,
   onLogout,
 }: Props) {
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -222,6 +225,27 @@ export function ProfileScreen({
             size={22}
           />
         </Pressable>
+        <Pressable
+          onPress={onCheckUpdate}
+          style={({ pressed }) => [
+            styles.settingRow,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <View style={styles.settingIcon}>
+            <MaterialCommunityIcons
+              color={colors.primary}
+              name="cellphone-arrow-down"
+              size={22}
+            />
+          </View>
+          <Text style={styles.settingLabel}>检查更新</Text>
+          <MaterialCommunityIcons
+            color={colors.muted}
+            name="chevron-right"
+            size={22}
+          />
+        </Pressable>
       </View>
       <Pressable
         onPress={onLogout}
@@ -238,7 +262,10 @@ export function ProfileScreen({
         transparent
         visible={profileModalVisible}
       >
-        <Pressable onPress={closeProfileModal} style={styles.modalBackdrop}>
+        <KeyboardCenteredModal
+          onPress={closeProfileModal}
+          style={styles.modalBackdrop}
+        >
           <Pressable onPress={() => undefined} style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>编辑资料</Text>
@@ -306,7 +333,7 @@ export function ProfileScreen({
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </KeyboardCenteredModal>
       </Modal>
       <Modal
         animationType="fade"
@@ -314,7 +341,10 @@ export function ProfileScreen({
         transparent
         visible={passwordModalVisible}
       >
-        <Pressable onPress={closePasswordModal} style={styles.modalBackdrop}>
+        <KeyboardCenteredModal
+          onPress={closePasswordModal}
+          style={styles.modalBackdrop}
+        >
           <Pressable onPress={() => undefined} style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>修改登录密码</Text>
@@ -384,7 +414,7 @@ export function ProfileScreen({
               </Pressable>
             </View>
           </Pressable>
-        </Pressable>
+        </KeyboardCenteredModal>
       </Modal>
     </View>
   );
@@ -451,8 +481,6 @@ const styles = StyleSheet.create({
   logoutText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
     backgroundColor: 'rgba(23, 32, 51, 0.45)',
   },
   modalCard: {
