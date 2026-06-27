@@ -34,7 +34,10 @@ export class OpenImService {
     const token = await this.getAdminToken();
     const data = await this.request<OpenImUsersData>(
       '/user/get_users',
-      { userIDs: [userID] },
+      {
+        userIDs: [userID],
+        pagination: { pageNumber: 1, showNumber: 1 },
+      },
       token,
     );
     if (data.users.some((user) => user.userID === userID)) {
