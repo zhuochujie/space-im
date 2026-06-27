@@ -11,5 +11,5 @@ export interface OpenImTokenData {
 }
 
 export interface OpenImUsersData {
-  users: Array<{ userID: string }>;
+  users: Array<{ userID: string }> | null;
 }

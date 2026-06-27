@@ -40,7 +40,7 @@ export class OpenImService {
       },
       token,
     );
-    if (data.users.some((user) => user.userID === userID)) {
+    if (data.users?.some((user) => user.userID === userID)) {
       return false;
     }
 
