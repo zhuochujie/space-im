@@ -56,8 +56,6 @@ services:
       - "${DATA_DIR}/components/mongodb/data/db:/data/db"
       - "${DATA_DIR}/components/mongodb/data/logs:/data/logs"
       - "${DATA_DIR}/components/mongodb/data/conf:/etc/mongo"
-    ports:
-      - "37017:27017"
     environment:
       - TZ=Asia/Shanghai
       - wiredTigerCacheSizeGB=1
@@ -99,9 +97,6 @@ services:
   etcd:
     image: "${ETCD_IMAGE}"
     container_name: etcd
-    ports:
-      - "12379:2379"
-      - "12380:2380"
     environment:
       - ETCD_NAME=s1
       - ETCD_DATA_DIR=/etcd-data
@@ -265,7 +260,6 @@ services:
     image: "${MINIO_IMAGE}"
     ports:
       - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9090"
     container_name: minio
     volumes:
       - "${DATA_DIR}/components/mnt/data:/data"
