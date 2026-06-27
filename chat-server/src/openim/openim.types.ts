@@ -9,3 +9,7 @@ export interface OpenImTokenData {
   token: string;
   expireTimeSeconds: number;
 }
+
+export interface OpenImUsersData {
+  users: Array<{ userID: string }>;
+}

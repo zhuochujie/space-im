@@ -240,7 +240,8 @@ Content-Type: application/json
 
 只有用户表中 `isAdmin=true` 且 `status=active` 的用户可以登录后台。Docker
 部署时可通过 `SPACE_ADMIN_PHONE_NUMBER` 和 `SPACE_ADMIN_PASSWORD` 初始化一个
-管理员账号。
+管理员。初始密码只会在账号首次创建时写入，容器重启不会覆盖后台修改后的密码；
+初始化流程也会确保同一用户存在于 OpenIM 服务中。
 
 成功响应中的 `token` 用于访问其他 `/admin/*` 接口：
 

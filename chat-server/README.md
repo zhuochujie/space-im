@@ -15,7 +15,7 @@ token。
 | `PORT` | HTTP 服务端口 | `3000` |
 | `ADMIN_SESSION_SECRET` | 后台登录会话签名密钥 | 必填 |
 | `SPACE_ADMIN_PHONE_NUMBER` | 初始后台管理员手机号 | 可选 |
-| `SPACE_ADMIN_PASSWORD` | 初始后台管理员密码 | 可选 |
+| `SPACE_ADMIN_PASSWORD` | 初始后台管理员密码（仅首次创建时写入） | 可选 |
 | `MONGODB_URI` | MongoDB 连接地址 | `mongodb://mongo:27017` |
 | `MONGODB_DATABASE` | MongoDB 数据库名称 | `chat_server` |
 | `MONGO_USERNAME` | MongoDB 用户名 | 可选 |

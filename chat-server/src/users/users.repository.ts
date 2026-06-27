@@ -80,23 +80,32 @@ export class UsersRepository {
     phoneNumber: string;
     passwordHash: string;
     userID: string;
-  }): Promise<void> {
+  }): Promise<PublicUser> {
     try {
       await this.userModel.updateOne(
         { phoneNumber: user.phoneNumber },
         {
           $set: {
-            passwordHash: user.passwordHash,
             status: 'active',
             isAdmin: true,
           },
           $setOnInsert: {
             userID: user.userID,
             phoneNumber: user.phoneNumber,
+            passwordHash: user.passwordHash,
           },
         },
         { upsert: true },
       );
+      const admin = await this.userModel
+        .findOne({ phoneNumber: user.phoneNumber })
+        .select('-passwordHash')
+        .lean<PublicUser>()
+        .exec();
+      if (!admin) {
+        throw new Error('Bootstrap admin was not found after upsert');
+      }
+      return admin;
     } catch (error) {
       throw new InternalServerErrorException('管理员初始化失败', {
         cause: error,

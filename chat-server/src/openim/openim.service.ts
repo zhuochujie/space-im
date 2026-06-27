@@ -4,7 +4,11 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { OpenImResponse, OpenImTokenData } from './openim.types';
+import {
+  OpenImResponse,
+  OpenImTokenData,
+  OpenImUsersData,
+} from './openim.types';
 
 interface CachedToken {
   token: string;
@@ -24,6 +28,21 @@ export class OpenImService {
       },
       token,
     );
+  }
+
+  async ensureUser(userID: string, nickname: string): Promise<boolean> {
+    const token = await this.getAdminToken();
+    const data = await this.request<OpenImUsersData>(
+      '/user/get_users',
+      { userIDs: [userID] },
+      token,
+    );
+    if (data.users.some((user) => user.userID === userID)) {
+      return false;
+    }
+
+    await this.registerUser(userID, nickname);
+    return true;
   }
 
   async getUserToken(
