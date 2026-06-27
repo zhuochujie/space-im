@@ -4,7 +4,13 @@ import { LoginPage } from './pages/LoginPage'
 import { MessagesPage } from './pages/MessagesPage'
 import { UpdatesPage } from './pages/UpdatesPage'
 import { UsersPage } from './pages/UsersPage'
-import type { AdminRequest, AdminSession, ApiResponse, RouteKey } from './types'
+import type {
+  AdminRequest,
+  AdminSession,
+  AdminUpload,
+  ApiResponse,
+  RouteKey,
+} from './types'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_CHAT_SERVER_URL ?? '/api'
@@ -52,6 +58,51 @@ function App() {
     }
     return payload.data
   }, [normalizedApiBase, session?.token])
+
+  const upload: AdminUpload = useCallback(
+    <T,>(
+      path: string,
+      file: Blob,
+      onProgress: (percentage: number) => void,
+    ): Promise<T> => {
+      setError('')
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', `${normalizedApiBase}${path}`)
+        xhr.setRequestHeader(
+          'content-type',
+          'application/vnd.android.package-archive',
+        )
+        if (session?.token) {
+          xhr.setRequestHeader('authorization', `Bearer ${session.token}`)
+        }
+        xhr.upload.onprogress = (event) => {
+          const total = event.lengthComputable ? event.total : file.size
+          if (total > 0) {
+            onProgress(Math.min(100, Math.round((event.loaded / total) * 100)))
+          }
+        }
+        xhr.onerror = () => reject(new Error('上传失败，请检查网络连接'))
+        xhr.onload = () => {
+          let payload: ApiResponse<T> | null = null
+          try {
+            payload = JSON.parse(xhr.responseText) as ApiResponse<T>
+          } catch {
+            reject(new Error(`请求失败 (${xhr.status})`))
+            return
+          }
+          if (xhr.status < 200 || xhr.status >= 300 || payload.code !== 0) {
+            reject(new Error(payload.message || `请求失败 (${xhr.status})`))
+            return
+          }
+          onProgress(100)
+          resolve(payload.data)
+        }
+        xhr.send(file)
+      })
+    },
+    [normalizedApiBase, session?.token],
+  )
 
   useEffect(() => {
     if (session) {
@@ -126,6 +177,7 @@ function App() {
           setError={setError}
           setLoading={setLoading}
           setNotice={setNotice}
+          upload={upload}
         />
       ) : route === 'messages' ? (
         <MessagesPage

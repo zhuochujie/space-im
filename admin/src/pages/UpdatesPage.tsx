@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { getErrorMessage } from '../lib/errors'
 import { formatTime } from '../lib/format'
-import type { AppUpdateInfo, PageProps } from '../types'
+import type { AdminUpload, AppUpdateInfo, PageProps } from '../types'
+
+interface UpdatesPageProps extends PageProps {
+  upload: AdminUpload
+}
 
 export function UpdatesPage({
   loading,
@@ -10,13 +14,15 @@ export function UpdatesPage({
   setError,
   setLoading,
   setNotice,
-}: PageProps) {
+  upload,
+}: UpdatesPageProps) {
   const [latest, setLatest] = useState<AppUpdateInfo | null>(null)
   const [apkFile, setApkFile] = useState<File | null>(null)
   const [versionCode, setVersionCode] = useState('')
   const [versionName, setVersionName] = useState('')
   const [releaseNotes, setReleaseNotes] = useState('')
   const [forceUpdate, setForceUpdate] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
 
   const loadLatest = useCallback(async () => {
     setLoading(true)
@@ -54,6 +60,7 @@ export function UpdatesPage({
 
     setLoading(true)
     setNotice('')
+    setUploadProgress(0)
     try {
       const params = new URLSearchParams({
         versionCode: String(code),
@@ -63,20 +70,16 @@ export function UpdatesPage({
       if (releaseNotes.trim()) {
         params.set('releaseNotes', releaseNotes.trim())
       }
-      const data = await request<AppUpdateInfo>(
+      const data = await upload<AppUpdateInfo>(
         `/admin/app-update/android?${params.toString()}`,
-        {
-          method: 'PUT',
-          headers: {
-            'content-type': 'application/vnd.android.package-archive',
-          },
-          body: apkFile,
-        },
+        apkFile,
+        setUploadProgress,
       )
       setLatest(data)
       setApkFile(null)
       setNotice('安卓安装包已更新')
     } catch (err) {
+      setUploadProgress(null)
       setError(getErrorMessage(err))
     } finally {
       setLoading(false)
@@ -122,7 +125,10 @@ export function UpdatesPage({
           APK 文件
           <input
             accept=".apk,application/vnd.android.package-archive"
-            onChange={(event) => setApkFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => {
+              setApkFile(event.target.files?.[0] ?? null)
+              setUploadProgress(null)
+            }}
             type="file"
           />
         </label>
@@ -162,8 +168,29 @@ export function UpdatesPage({
           />
         </label>
         <button type="submit" disabled={loading}>
-          上传最新版本
+          {loading && uploadProgress !== null
+            ? uploadProgress === 100
+              ? '服务器处理中'
+              : `上传中 ${uploadProgress}%`
+            : '上传最新版本'}
         </button>
+        {uploadProgress !== null && (
+          <div className="uploadProgress" aria-live="polite">
+            <div className="uploadProgressLabel">
+              <span>
+                {uploadProgress < 100
+                  ? '正在上传 APK'
+                  : loading
+                    ? '服务器处理中'
+                    : '上传完成'}
+              </span>
+              <strong>{uploadProgress}%</strong>
+            </div>
+            <progress max="100" value={uploadProgress}>
+              {uploadProgress}%
+            </progress>
+          </div>
+        )}
       </form>
     </section>
   )

@@ -6,6 +6,11 @@ export type AdminRequest = <T>(
   path: string,
   options?: RequestInit,
 ) => Promise<T>
+export type AdminUpload = <T>(
+  path: string,
+  file: Blob,
+  onProgress: (percentage: number) => void,
+) => Promise<T>
 
 export interface ApiResponse<T> {
   code: number
