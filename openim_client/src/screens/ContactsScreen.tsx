@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -17,12 +18,12 @@ import type {
   GroupApplicationItem,
   GroupItem,
 } from '@openim/rn-client-sdk';
-import { DataScanner } from 'react-native-data-scanner';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { Avatar } from '../components/Avatar';
 import { EmptyState } from '../components/EmptyState';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
+import { GroupQrScannerModal } from '../components/GroupQrScannerModal';
 import { colors } from '../theme/colors';
 import { parseGroupInviteValue } from '../utils/groupInvite';
 import { showConfirm, showToast } from '../utils/toast';
@@ -37,7 +38,9 @@ type Props = {
   onOpenFriend: (friend: FriendUserItem) => void;
   onOpenGroup: (group: GroupItem) => void;
   onRefresh: () => void;
-  onAddFriend: (phoneNumber: string, message: string) => Promise<boolean>;
+  onSearchFriend: (phoneNumber: string) => Promise<UserSearchResult | undefined>;
+  onSearchGroup: (groupID: string) => Promise<GroupItem | undefined>;
+  onAddFriend: (userID: string, message: string) => Promise<boolean>;
   onJoinGroup: (groupID: string, message: string) => Promise<boolean>;
   onCreateGroup: (name: string, memberUserIDs: string[]) => Promise<boolean>;
   onDeleteFriend: (friend: FriendUserItem) => Promise<boolean>;
@@ -60,6 +63,17 @@ type Props = {
   ) => Promise<boolean>;
 };
 
+export type UserSearchResult = {
+  userID: string;
+  phoneNumber: string;
+  nickname: string;
+  faceURL: string;
+};
+
+type SearchResult =
+  | { kind: 'friend'; item: UserSearchResult }
+  | { kind: 'group'; item: GroupItem };
+
 type Action = 'friend' | 'join' | 'create';
 
 const defaultFriendMessage = '你好，我想添加你为好友';
@@ -75,6 +89,8 @@ export function ContactsScreen({
   onOpenFriend,
   onOpenGroup,
   onRefresh,
+  onSearchFriend,
+  onSearchGroup,
   onAddFriend,
   onJoinGroup,
   onCreateGroup,
@@ -92,7 +108,10 @@ export function ContactsScreen({
   const [groupName, setGroupName] = useState('');
   const [selectedUserIDs, setSelectedUserIDs] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<SearchResult>();
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const openingScanner = useRef(false);
   const rows = useMemo(
     () => [
       ...groups.map(item => ({ kind: 'group' as const, item })),
@@ -113,6 +132,7 @@ export function ContactsScreen({
     setMessage(defaultFriendMessage);
     setGroupName('');
     setSelectedUserIDs([]);
+    setSearchResult(undefined);
   };
 
   const openAction = (nextAction: Action) => {
@@ -124,7 +144,64 @@ export function ContactsScreen({
     );
     setGroupName('');
     setSelectedUserIDs([]);
+    setSearchResult(undefined);
   };
+
+  const targetStatus = useMemo(() => {
+    if (!searchResult) {
+      return '';
+    }
+    if (searchResult.kind === 'friend') {
+      if (searchResult.item.userID === selfUserID) {
+        return '这是你自己';
+      }
+      return friends.some(friend => friend.userID === searchResult.item.userID)
+        ? '已是好友'
+        : '';
+    }
+    return groups.some(group => group.groupID === searchResult.item.groupID)
+      ? '已加入'
+      : '';
+  }, [friends, groups, searchResult, selfUserID]);
+
+  const searchTarget = useCallback(
+    async (rawKeyword?: string) => {
+      if (searching || submitting) {
+        return;
+      }
+      const keyword = (rawKeyword ?? targetID).trim();
+      if (!keyword) {
+        showToast(action === 'friend' ? '请输入手机号' : '请输入群号');
+        return;
+      }
+      Keyboard.dismiss();
+      setSearching(true);
+      setSearchResult(undefined);
+      try {
+        if (action === 'friend') {
+          const user = await onSearchFriend(keyword);
+          if (user) {
+            setSearchResult({ kind: 'friend', item: user });
+          }
+        } else {
+          const group = await onSearchGroup(keyword);
+          if (group) {
+            setSearchResult({ kind: 'group', item: group });
+          }
+        }
+      } finally {
+        setSearching(false);
+      }
+    },
+    [
+      action,
+      onSearchFriend,
+      onSearchGroup,
+      searching,
+      submitting,
+      targetID,
+    ],
+  );
 
   const submitAction = async () => {
     if (submitting) {
@@ -134,11 +211,14 @@ export function ContactsScreen({
     setSubmitting(true);
     let succeeded = false;
     try {
-      if (action === 'friend') {
-        succeeded = await onAddFriend(targetID.trim(), message.trim());
-      } else if (action === 'join') {
+      if (action === 'friend' && searchResult?.kind === 'friend') {
+        succeeded = await onAddFriend(
+          searchResult.item.userID,
+          message.trim(),
+        );
+      } else if (action === 'join' && searchResult?.kind === 'group') {
         succeeded = await onJoinGroup(
-          targetID.trim(),
+          searchResult.item.groupID,
           message.trim() || defaultGroupMessage,
         );
       } else {
@@ -153,35 +233,61 @@ export function ContactsScreen({
   };
 
   const submitDisabled =
-    submitting || (action === 'create' ? !groupName.trim() : !targetID.trim());
+    submitting ||
+    (action === 'create'
+      ? !groupName.trim()
+      : !searchResult || Boolean(targetStatus));
 
-  const scanGroupQrCode = async () => {
-    if (scanning || submitting) {
+  const openGroupQrScanner = () => {
+    if (submitting) {
       return;
     }
     Keyboard.dismiss();
-    setScanning(true);
-    try {
-      const barcode = await DataScanner.scanBarcode({
-        targetFormats: ['qr'],
-        enableAutoZoom: true,
-      });
-      const groupID = parseGroupInviteValue(barcode.value);
+    setActionVisible(false);
+    if (Platform.OS === 'ios') {
+      openingScanner.current = true;
+      return;
+    }
+    setTimeout(() => setScannerVisible(true), 250);
+  };
+
+  const handleActionDismiss = () => {
+    if (openingScanner.current) {
+      openingScanner.current = false;
+      setScannerVisible(true);
+      return;
+    }
+    resetActionForm();
+  };
+
+  const closeGroupQrScanner = useCallback(() => {
+    setScannerVisible(false);
+    if (Platform.OS !== 'ios') {
+      setTimeout(() => setActionVisible(true), 250);
+    }
+  }, []);
+
+  const handleScannerDismiss = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      setActionVisible(true);
+    }
+  }, []);
+
+  const handleGroupQrScanned = useCallback(
+    (value: string) => {
+      const groupID = parseGroupInviteValue(value);
       if (!groupID) {
         showToast('不是有效的 SPACE IM 群二维码');
-        return;
+        return false;
       }
       setTargetID(groupID);
-      showToast('已识别群二维码');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '';
-      if (!/cancel/i.test(errorMessage)) {
-        showToast('扫码功能不可用');
-      }
-    } finally {
-      setScanning(false);
-    }
-  };
+      setSearchResult(undefined);
+      closeGroupQrScanner();
+      searchTarget(groupID);
+      return true;
+    },
+    [closeGroupQrScanner, searchTarget],
+  );
 
   const confirmDeleteFriend = async (friend: FriendUserItem) => {
     const name = friend.remark || friend.nickname || friend.userID;
@@ -290,7 +396,7 @@ export function ContactsScreen({
       />
       <Modal
         animationType="fade"
-        onDismiss={resetActionForm}
+        onDismiss={handleActionDismiss}
         onRequestClose={closeAction}
         transparent
         visible={actionVisible}
@@ -363,77 +469,153 @@ export function ContactsScreen({
               </>
             ) : (
               <>
-                <View style={action === 'join' && styles.groupIDInputRow}>
-                  <TextInput
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onChangeText={setTargetID}
-                    placeholder={
-                      action === 'friend' ? '请输入手机号' : '请输入群号'
-                    }
-                    placeholderTextColor="#A4ADBC"
-                    style={[
-                      styles.input,
-                      action === 'join' && styles.groupIDInput,
-                    ]}
-                    value={targetID}
-                  />
-                  {action === 'join' ? (
+                {!searchResult ? (
+                  <View style={styles.searchInputRow}>
+                    <TextInput
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onChangeText={setTargetID}
+                      onSubmitEditing={() => searchTarget()}
+                      placeholder={
+                        action === 'friend' ? '请输入手机号' : '请输入群号'
+                      }
+                      placeholderTextColor="#A4ADBC"
+                      returnKeyType="search"
+                      style={[styles.input, styles.searchInput]}
+                      value={targetID}
+                    />
                     <Pressable
-                      accessibilityLabel="扫描群二维码"
-                      disabled={scanning || submitting}
-                      onPress={scanGroupQrCode}
+                      accessibilityLabel={
+                        action === 'friend' ? '搜索用户' : '搜索群聊'
+                      }
+                      disabled={searching || submitting}
+                      onPress={() => searchTarget()}
                       style={[
-                        styles.scanButton,
-                        (scanning || submitting) && styles.submitButtonDisabled,
+                        styles.searchButton,
+                        (searching || submitting) &&
+                          styles.submitButtonDisabled,
                       ]}
                     >
-                      {scanning ? (
+                      {searching ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
                       ) : (
+                        <MaterialCommunityIcons
+                          color="#FFFFFF"
+                          name="magnify"
+                          size={24}
+                        />
+                      )}
+                    </Pressable>
+                    {action === 'join' ? (
+                      <Pressable
+                        accessibilityLabel="扫描群二维码"
+                        disabled={submitting}
+                        onPress={openGroupQrScanner}
+                        style={[
+                          styles.scanButton,
+                          submitting && styles.submitButtonDisabled,
+                        ]}
+                      >
                         <MaterialCommunityIcons
                           color="#FFFFFF"
                           name="qrcode-scan"
                           size={23}
                         />
-                      )}
-                    </Pressable>
-                  ) : null}
-                </View>
-                <TextInput
-                  multiline
-                  onChangeText={setMessage}
-                  placeholder="申请说明"
-                  placeholderTextColor="#A4ADBC"
-                  style={[styles.input, styles.messageInput]}
-                  value={message}
-                />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+                {searchResult ? (
+                  <>
+                    <View style={styles.searchResultRow}>
+                      <Avatar
+                        name={
+                          searchResult.kind === 'friend'
+                            ? searchResult.item.nickname
+                            : searchResult.item.groupName
+                        }
+                        size={46}
+                        uri={searchResult.item.faceURL}
+                      />
+                      <View style={styles.searchResultBody}>
+                        <Text numberOfLines={1} style={styles.searchResultName}>
+                          {searchResult.kind === 'friend'
+                            ? searchResult.item.nickname
+                            : searchResult.item.groupName}
+                        </Text>
+                        <Text style={styles.searchResultMeta}>
+                          {searchResult.kind === 'friend'
+                            ? searchResult.item.phoneNumber
+                            : `${searchResult.item.memberCount} 位成员`}
+                        </Text>
+                      </View>
+                      {targetStatus ? (
+                        <Text style={styles.existingTargetText}>
+                          {targetStatus}
+                        </Text>
+                      ) : null}
+                      <Pressable
+                        accessibilityLabel="清除搜索结果"
+                        hitSlop={8}
+                        onPress={() => {
+                          setSearchResult(undefined);
+                          setTargetID('');
+                        }}
+                        style={styles.clearResultButton}
+                      >
+                        <MaterialCommunityIcons
+                          color={colors.muted}
+                          name="close"
+                          size={21}
+                        />
+                      </Pressable>
+                    </View>
+                    {!targetStatus ? (
+                      <TextInput
+                        multiline
+                        onChangeText={setMessage}
+                        placeholder="申请说明"
+                        placeholderTextColor="#A4ADBC"
+                        style={[styles.input, styles.messageInput]}
+                        value={message}
+                      />
+                    ) : null}
+                  </>
+                ) : null}
               </>
             )}
             <View style={styles.modalActions}>
               <Pressable onPress={closeAction} style={styles.cancelButton}>
                 <Text style={styles.cancelText}>取消</Text>
               </Pressable>
-              <Pressable
-                disabled={submitDisabled}
-                onPress={submitAction}
-                style={[
-                  styles.submitButton,
-                  submitDisabled && styles.submitButtonDisabled,
-                ]}
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.submitText}>
-                    {action === 'create' ? '创建' : '发送申请'}
-                  </Text>
-                )}
-              </Pressable>
+              {action === 'create' || (searchResult && !targetStatus) ? (
+                <Pressable
+                  disabled={submitDisabled}
+                  onPress={submitAction}
+                  style={[
+                    styles.submitButton,
+                    submitDisabled && styles.submitButtonDisabled,
+                  ]}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.submitText}>
+                      {action === 'create' ? '创建' : '发送申请'}
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null}
             </View>
           </Pressable>
         </KeyboardCenteredModal>
       </Modal>
+      <GroupQrScannerModal
+        onClose={closeGroupQrScanner}
+        onDismiss={handleScannerDismiss}
+        onScanned={handleGroupQrScanned}
+        visible={scannerVisible}
+      />
     </View>
   );
 }
@@ -827,12 +1009,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 12,
   },
-  groupIDInputRow: {
+  searchInputRow: {
     flexDirection: 'row',
     gap: 10,
   },
-  groupIDInput: {
+  searchInput: {
     flex: 1,
+  },
+  searchButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    backgroundColor: colors.primary,
   },
   scanButton: {
     width: 48,
@@ -842,6 +1033,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
     backgroundColor: colors.primary,
+  },
+  searchResultRow: {
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  searchResultBody: { flex: 1, marginLeft: 12 },
+  searchResultName: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  searchResultMeta: { color: colors.muted, fontSize: 13, marginTop: 4 },
+  existingTargetText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
+  clearResultButton: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
   messageInput: {
     height: 84,

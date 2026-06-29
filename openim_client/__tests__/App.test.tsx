@@ -76,8 +76,9 @@ jest.mock('react-native-nitro-sound', () => ({
 
 jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
 
-jest.mock('react-native-data-scanner', () => ({
-  DataScanner: { scanBarcode: jest.fn() },
+jest.mock('react-native-camera-kit', () => ({
+  Camera: 'Camera',
+  CameraType: { Back: 'back' },
 }));
 
 jest.mock('react-native-qrcode-svg', () => 'QRCode');

@@ -31,7 +31,10 @@ import { getErrorCode, getErrorMessage } from '../utils/errors';
 import { showToast } from '../utils/toast';
 import { getUserByPhoneNumber } from '../services/chatApi';
 import { ChatScreen } from './ChatScreen';
-import { ContactsScreen } from './ContactsScreen';
+import {
+  ContactsScreen,
+  type UserSearchResult,
+} from './ContactsScreen';
 import { ConversationsScreen } from './ConversationsScreen';
 import { ProfileScreen } from './ProfileScreen';
 
@@ -401,28 +404,43 @@ export function MainScreen({
     return true;
   };
 
-  const addFriend = async (
+  const searchFriend = async (
     friendPhoneNumber: string,
-    message: string,
-  ): Promise<boolean> => {
+  ): Promise<UserSearchResult | undefined> => {
     try {
       const target = await getUserByPhoneNumber(
         config.chatServerAddr,
         friendPhoneNumber.trim(),
       );
-      return await sendFriendRequest(
-        target.userID,
-        message,
-        target.phoneNumber,
-      );
+      const [user] = await OpenIMSDK.getUsersInfo([target.userID]);
+      return {
+        userID: target.userID,
+        phoneNumber: target.phoneNumber,
+        nickname: user?.nickname || target.phoneNumber,
+        faceURL: user?.faceURL || '',
+      };
     } catch (error) {
       const messageText = getErrorMessage(error);
       if (messageText.includes('用户不存在')) {
         showToast('用户不存在');
-        return false;
+        return undefined;
       }
-      showToast('添加失败');
-      return false;
+      showToast('搜索用户失败');
+      return undefined;
+    }
+  };
+
+  const searchGroup = async (groupID: string): Promise<GroupItem | undefined> => {
+    try {
+      const [group] = await OpenIMSDK.getSpecifiedGroupsInfo([groupID.trim()]);
+      if (!group) {
+        showToast('群不存在');
+        return undefined;
+      }
+      return group;
+    } catch {
+      showToast('搜索群聊失败');
+      return undefined;
     }
   };
 
@@ -769,10 +787,14 @@ export function MainScreen({
             selfUserID={profile?.userID ?? ''}
             onAcceptFriendApplication={acceptFriendApplication}
             onAcceptGroupApplication={acceptGroupApplication}
-            onAddFriend={addFriend}
+            onAddFriend={(userID, message) =>
+              sendFriendRequest(userID, message, userID)
+            }
             onCreateGroup={createGroup}
             onDeleteFriend={friend => deleteFriend(friend.userID)}
             onJoinGroup={joinGroup}
+            onSearchFriend={searchFriend}
+            onSearchGroup={searchGroup}
             onLeaveGroup={group => quitGroup(group.groupID, group.groupName)}
             onOpenFriend={friend =>
               openTarget(
