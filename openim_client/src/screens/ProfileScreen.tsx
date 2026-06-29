@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -126,6 +128,7 @@ export function ProfileScreen({
     if (saving) {
       return;
     }
+    Keyboard.dismiss();
     const nextNickname = nicknameDraft.trim();
     if (!nextNickname) {
       showToast('请输入昵称');
@@ -151,6 +154,7 @@ export function ProfileScreen({
     if (saving) {
       return;
     }
+    Keyboard.dismiss();
     if (!oldPassword || !newPassword || !confirmPassword) {
       showToast('请填写完整密码');
       return;
@@ -225,27 +229,29 @@ export function ProfileScreen({
             size={22}
           />
         </Pressable>
-        <Pressable
-          onPress={onCheckUpdate}
-          style={({ pressed }) => [
-            styles.settingRow,
-            pressed && styles.buttonPressed,
-          ]}
-        >
-          <View style={styles.settingIcon}>
+        {Platform.OS === 'android' ? (
+          <Pressable
+            onPress={onCheckUpdate}
+            style={({ pressed }) => [
+              styles.settingRow,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <View style={styles.settingIcon}>
+              <MaterialCommunityIcons
+                color={colors.primary}
+                name="cellphone-arrow-down"
+                size={22}
+              />
+            </View>
+            <Text style={styles.settingLabel}>检查更新</Text>
             <MaterialCommunityIcons
-              color={colors.primary}
-              name="cellphone-arrow-down"
+              color={colors.muted}
+              name="chevron-right"
               size={22}
             />
-          </View>
-          <Text style={styles.settingLabel}>检查更新</Text>
-          <MaterialCommunityIcons
-            color={colors.muted}
-            name="chevron-right"
-            size={22}
-          />
-        </Pressable>
+          </Pressable>
+        ) : null}
       </View>
       <Pressable
         onPress={onLogout}

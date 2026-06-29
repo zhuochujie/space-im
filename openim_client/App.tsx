@@ -15,6 +15,7 @@ import OpenIMSDK, {
 import RNFS from 'react-native-fs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppUpdateProgressModal } from './src/components/AppUpdateProgressModal';
 import { ToastHost } from './src/components/ToastHost';
 import { DEFAULT_SERVER_CONFIG } from './src/config/openim';
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -372,11 +373,12 @@ function AppContent() {
       }
       await OpenIMSDK.setSelfInfo({ nickname: nextNickname, faceURL });
       const self = await OpenIMSDK.getSelfUserInfo().catch(() => undefined);
-      setProfile(current =>
-        self ??
-        (current
-          ? { ...current, nickname: nextNickname, faceURL: faceURL || '' }
-          : current),
+      setProfile(
+        current =>
+          self ??
+          (current
+            ? { ...current, nickname: nextNickname, faceURL: faceURL || '' }
+            : current),
       );
       showToast('资料已修改');
       return true;
@@ -428,6 +430,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar backgroundColor={colors.background} barStyle="dark-content" />
       <AppContent />
+      <AppUpdateProgressModal />
       <ToastHost />
     </SafeAreaProvider>
   );

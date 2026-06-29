@@ -44,7 +44,7 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>用于拍照并发送聊天图片</string>
+	<string>用于拍照发送聊天图片和扫描群二维码</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSMicrophoneUsageDescription</key>

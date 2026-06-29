@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   BackHandler,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -50,6 +51,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../components/Avatar';
 import { CachedImage } from '../components/CachedImage';
 import { EmptyState } from '../components/EmptyState';
+import { GroupQrModal } from '../components/GroupQrModal';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
 import type { ChatTarget } from '../types/app';
@@ -165,6 +167,7 @@ export function ChatScreen({
   const [remark, setRemark] = useState(friend?.remark || '');
   const [remarkModalVisible, setRemarkModalVisible] = useState(false);
   const [groupInfoModalVisible, setGroupInfoModalVisible] = useState(false);
+  const [groupQrVisible, setGroupQrVisible] = useState(false);
   const [groupNameDraft, setGroupNameDraft] = useState('');
   const [groupAvatarDraftUri, setGroupAvatarDraftUri] = useState('');
   const [groupAvatarDraftPath, setGroupAvatarDraftPath] = useState('');
@@ -851,6 +854,7 @@ export function ChatScreen({
     if (saving) {
       return;
     }
+    Keyboard.dismiss();
     setSaving(true);
     try {
       const succeeded = await onSetRemark(remark.trim());
@@ -937,6 +941,7 @@ export function ChatScreen({
     if (saving || !canEditGroupInfo) {
       return;
     }
+    Keyboard.dismiss();
     const groupName = groupNameDraft.trim();
     if (!groupName) {
       showToast('请输入群名称');
@@ -1102,6 +1107,7 @@ export function ChatScreen({
     const groupUnavailable = (changedGroup: GroupItem) => {
       if (changedGroup.groupID === target.groupID) {
         setSettingsVisible(false);
+        setGroupQrVisible(false);
         setGroupMembersPageVisible(false);
         setMemberModalVisible(false);
         showToast('群聊已变更');
@@ -1174,6 +1180,7 @@ export function ChatScreen({
     setSelectedInviteUserIDs([]);
     setRemarkModalVisible(false);
     setGroupInfoModalVisible(false);
+    setGroupQrVisible(false);
     resetGroupInfoDraft();
   }, [resetGroupInfoDraft, saving]);
 
@@ -1215,6 +1222,10 @@ export function ChatScreen({
           resetGroupInfoDraft();
           return true;
         }
+        if (groupQrVisible) {
+          setGroupQrVisible(false);
+          return true;
+        }
         if (groupMembersPageVisible) {
           setGroupMembersPageVisible(false);
           return true;
@@ -1243,6 +1254,7 @@ export function ChatScreen({
     closeSettings,
     friend?.remark,
     groupInfoModalVisible,
+    groupQrVisible,
     groupMembersPageVisible,
     inviteVisible,
     memberModalVisible,
@@ -1811,9 +1823,7 @@ export function ChatScreen({
         <Pressable onPress={closePreviewImage} style={styles.previewBackdrop}>
           {previewImage ? (
             <Pressable
-              onLongPress={() =>
-                confirmSaveMedia(previewImage, 'photo', 'jpg')
-              }
+              onLongPress={() => confirmSaveMedia(previewImage, 'photo', 'jpg')}
               onPress={closePreviewImage}
               style={styles.previewMediaTouchable}
             >
@@ -2042,6 +2052,27 @@ export function ChatScreen({
                   </View>
                 )}
                 <View style={styles.infoSection}>
+                  <Pressable
+                    accessibilityLabel="显示群二维码"
+                    onPress={() => setGroupQrVisible(true)}
+                    style={styles.groupQrRow}
+                  >
+                    <View style={styles.groupQrLabel}>
+                      <MaterialCommunityIcons
+                        color={colors.primary}
+                        name="qrcode"
+                        size={23}
+                      />
+                      <Text style={styles.groupQrText}>群二维码</Text>
+                    </View>
+                    <MaterialCommunityIcons
+                      color={colors.muted}
+                      name="chevron-right"
+                      size={21}
+                    />
+                  </Pressable>
+                </View>
+                <View style={styles.infoSection}>
                   <View style={styles.sectionHeader}>
                     <Text
                       style={[styles.sectionTitle, styles.sectionHeaderTitle]}
@@ -2168,6 +2199,12 @@ export function ChatScreen({
           </ScrollView>
         </View>
       )}
+      <GroupQrModal
+        groupID={target.groupID}
+        groupName={currentGroup?.groupName || target.title}
+        onClose={() => setGroupQrVisible(false)}
+        visible={groupQrVisible}
+      />
       <Modal
         animationType="fade"
         onRequestClose={closeRemarkModal}
@@ -2485,8 +2522,8 @@ export function ChatScreen({
                     {selectedMember.userID === selfUserID
                       ? '我自己'
                       : selectedMemberFriend
-                        ? '已是好友'
-                        : '未添加'}
+                      ? '已是好友'
+                      : '未添加'}
                   </Text>
                 </View>
                 {canManageSelectedMemberRole && (
@@ -3116,6 +3153,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginBottom: 5,
+  },
+  groupQrRow: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  groupQrLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  groupQrText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
   },
   groupMemberGrid: {
     flexDirection: 'row',

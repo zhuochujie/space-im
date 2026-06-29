@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Modal,
   Pressable,
   RefreshControl,
@@ -16,12 +17,15 @@ import type {
   GroupApplicationItem,
   GroupItem,
 } from '@openim/rn-client-sdk';
+import { DataScanner } from 'react-native-data-scanner';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { Avatar } from '../components/Avatar';
 import { EmptyState } from '../components/EmptyState';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
-import { showConfirm } from '../utils/toast';
+import { parseGroupInviteValue } from '../utils/groupInvite';
+import { showConfirm, showToast } from '../utils/toast';
 
 type Props = {
   friends: FriendUserItem[];
@@ -88,6 +92,7 @@ export function ContactsScreen({
   const [groupName, setGroupName] = useState('');
   const [selectedUserIDs, setSelectedUserIDs] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const rows = useMemo(
     () => [
       ...groups.map(item => ({ kind: 'group' as const, item })),
@@ -125,6 +130,7 @@ export function ContactsScreen({
     if (submitting) {
       return;
     }
+    Keyboard.dismiss();
     setSubmitting(true);
     let succeeded = false;
     try {
@@ -148,6 +154,34 @@ export function ContactsScreen({
 
   const submitDisabled =
     submitting || (action === 'create' ? !groupName.trim() : !targetID.trim());
+
+  const scanGroupQrCode = async () => {
+    if (scanning || submitting) {
+      return;
+    }
+    Keyboard.dismiss();
+    setScanning(true);
+    try {
+      const barcode = await DataScanner.scanBarcode({
+        targetFormats: ['qr'],
+        enableAutoZoom: true,
+      });
+      const groupID = parseGroupInviteValue(barcode.value);
+      if (!groupID) {
+        showToast('不是有效的 SPACE IM 群二维码');
+        return;
+      }
+      setTargetID(groupID);
+      showToast('已识别群二维码');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (!/cancel/i.test(errorMessage)) {
+        showToast('扫码功能不可用');
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const confirmDeleteFriend = async (friend: FriendUserItem) => {
     const name = friend.remark || friend.nickname || friend.userID;
@@ -329,17 +363,43 @@ export function ContactsScreen({
               </>
             ) : (
               <>
-                <TextInput
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onChangeText={setTargetID}
-                  placeholder={
-                    action === 'friend' ? '请输入手机号' : '请输入群号'
-                  }
-                  placeholderTextColor="#A4ADBC"
-                  style={styles.input}
-                  value={targetID}
-                />
+                <View style={action === 'join' && styles.groupIDInputRow}>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onChangeText={setTargetID}
+                    placeholder={
+                      action === 'friend' ? '请输入手机号' : '请输入群号'
+                    }
+                    placeholderTextColor="#A4ADBC"
+                    style={[
+                      styles.input,
+                      action === 'join' && styles.groupIDInput,
+                    ]}
+                    value={targetID}
+                  />
+                  {action === 'join' ? (
+                    <Pressable
+                      accessibilityLabel="扫描群二维码"
+                      disabled={scanning || submitting}
+                      onPress={scanGroupQrCode}
+                      style={[
+                        styles.scanButton,
+                        (scanning || submitting) && styles.submitButtonDisabled,
+                      ]}
+                    >
+                      {scanning ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <MaterialCommunityIcons
+                          color="#FFFFFF"
+                          name="qrcode-scan"
+                          size={23}
+                        />
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
                 <TextInput
                   multiline
                   onChangeText={setMessage}
@@ -766,6 +826,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFBFD',
     fontSize: 15,
     marginBottom: 12,
+  },
+  groupIDInputRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  groupIDInput: {
+    flex: 1,
+  },
+  scanButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    backgroundColor: colors.primary,
   },
   messageInput: {
     height: 84,

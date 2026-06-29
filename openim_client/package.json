@@ -17,11 +17,14 @@
     "react": "19.2.3",
     "react-native": "0.86.0",
     "react-native-create-thumbnail": "^2.2.0",
+    "react-native-data-scanner": "^0.1.2",
     "react-native-fs": "^2.20.0",
     "react-native-image-picker": "^8.2.1",
     "react-native-nitro-modules": "^0.35.9",
     "react-native-nitro-sound": "^0.2.15",
+    "react-native-qrcode-svg": "^6.3.21",
     "react-native-safe-area-context": "^5.5.2",
+    "react-native-svg": "^15.15.5",
     "react-native-vector-icons": "^10.3.0"
   },
   "devDependencies": {

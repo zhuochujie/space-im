@@ -22,7 +22,23 @@ export type AndroidUpdateInfo = {
   versionName: string;
 };
 
+export type AppUpdateProgressState = {
+  percentage: number;
+  stage: 'downloading' | 'verifying' | 'installing';
+};
+
+type ProgressListener = (state?: AppUpdateProgressState) => void;
+
 let checking = false;
+let progressListener: ProgressListener | undefined;
+
+export function setAppUpdateProgressListener(listener?: ProgressListener) {
+  progressListener = listener;
+}
+
+function publishProgress(state?: AppUpdateProgressState) {
+  progressListener?.(state);
+}
 
 export async function checkAndroidUpdate(silent = true) {
   if (Platform.OS !== 'android' || checking) {
@@ -61,39 +77,56 @@ async function fetchLatestUpdate() {
 }
 
 function promptUpdate(update: AndroidUpdateInfo) {
-  const message = [
-    `发现新版本 ${update.versionName}`,
-    update.releaseNotes,
-  ].filter(Boolean).join('\n\n');
-  Alert.alert('版本更新', message, [
-    ...(!update.forceUpdate
-      ? [{ text: '稍后再说', style: 'cancel' as const }]
-      : []),
-    {
-      text: '立即更新',
-      onPress: () => void downloadAndInstall(update),
-    },
-  ], { cancelable: !update.forceUpdate });
+  const message = [`发现新版本 ${update.versionName}`, update.releaseNotes]
+    .filter(Boolean)
+    .join('\n\n');
+  Alert.alert(
+    '版本更新',
+    message,
+    [
+      ...(!update.forceUpdate
+        ? [{ text: '稍后再说', style: 'cancel' as const }]
+        : []),
+      {
+        text: '立即更新',
+        onPress: () => downloadAndInstall(update).catch(() => undefined),
+      },
+    ],
+    { cancelable: !update.forceUpdate },
+  );
 }
 
 async function downloadAndInstall(update: AndroidUpdateInfo) {
   try {
-    showToast('开始下载安装包');
+    publishProgress({ stage: 'downloading', percentage: 0 });
     const apkPath = `${RNFS.CachesDirectoryPath}/space-im-latest.apk`;
     const result = await RNFS.downloadFile({
       fromUrl: update.apkUrl,
       toFile: apkPath,
+      progressInterval: 200,
+      progress: ({ bytesWritten, contentLength }) => {
+        const total = contentLength > 0 ? contentLength : update.fileSize;
+        if (total > 0) {
+          publishProgress({
+            stage: 'downloading',
+            percentage: Math.min(100, Math.round((bytesWritten / total) * 100)),
+          });
+        }
+      },
     }).promise;
     if (result.statusCode < 200 || result.statusCode >= 300) {
       throw new Error(`download failed: ${result.statusCode}`);
     }
+    publishProgress({ stage: 'verifying', percentage: 100 });
     const sha256 = await RNFS.hash(apkPath, 'sha256');
     if (sha256 !== update.sha256) {
       throw new Error('sha256 mismatch');
     }
-    showToast('下载完成，准备安装');
+    publishProgress({ stage: 'installing', percentage: 100 });
     await installAndroidApk(apkPath);
   } catch {
     showToast('更新安装失败');
+  } finally {
+    publishProgress(undefined);
   }
 }

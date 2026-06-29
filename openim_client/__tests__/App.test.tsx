@@ -41,6 +41,7 @@ jest.mock('react-native-fs', () => ({
   })),
   unlink: jest.fn(() => Promise.resolve()),
   mkdir: jest.fn(() => Promise.resolve()),
+  hash: jest.fn(() => Promise.resolve('sha256')),
 }));
 
 jest.mock('react-native-image-picker', () => ({
@@ -74,6 +75,12 @@ jest.mock('react-native-nitro-sound', () => ({
 }));
 
 jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
+
+jest.mock('react-native-data-scanner', () => ({
+  DataScanner: { scanBarcode: jest.fn() },
+}));
+
+jest.mock('react-native-qrcode-svg', () => 'QRCode');
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
