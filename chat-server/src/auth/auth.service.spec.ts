@@ -84,15 +84,13 @@ describe('AuthService', () => {
   it('registers the user in OpenIM and stores a password hash', async () => {
     const result = await service.register({
       phoneNumber: '13800138000',
+      nickname: '测试用户',
       password: 'password123',
     });
 
     expect(result.phoneNumber).toBe('13800138000');
     expect(result.userID).toMatch(/^\d{10}$/);
-    expect(openIm.registerUser).toHaveBeenCalledWith(
-      result.userID,
-      '13800138000',
-    );
+    expect(openIm.registerUser).toHaveBeenCalledWith(result.userID, '测试用户');
     const storedUser = repository.reserve.mock.calls[0][0];
     expect(storedUser.userID).toBe(result.userID);
     expect(storedUser.phoneNumber).toBe('13800138000');
@@ -100,7 +98,7 @@ describe('AuthService', () => {
     expect(repository.activate).toHaveBeenCalledWith(result.userID);
   });
 
-  it('keeps compatibility with nickname on registration', async () => {
+  it('uses the submitted nickname when registering with OpenIM', async () => {
     const result = await service.register({
       phoneNumber: '13800138000',
       nickname: '艾丽丝',

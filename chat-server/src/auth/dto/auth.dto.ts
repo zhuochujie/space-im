@@ -1,12 +1,5 @@
 import { Transform } from 'class-transformer';
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  Length,
-  Matches,
-  Min,
-} from 'class-validator';
+import { IsInt, IsString, Length, Matches, Min } from 'class-validator';
 
 const PHONE_PATTERN = /^1[3-9]\d{9}$/;
 const PHONE_MESSAGE = '手机号格式不正确';
@@ -31,10 +24,9 @@ export class RegisterDto extends AuthCredentialsDto {
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @IsOptional()
   @IsString({ message: '昵称必须是字符串' })
   @Length(1, 32, { message: '昵称长度必须为 1-32 位' })
-  nickname?: string;
+  nickname!: string;
 }
 
 export class LoginDto extends AuthCredentialsDto {

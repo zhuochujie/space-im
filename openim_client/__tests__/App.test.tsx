@@ -52,6 +52,11 @@ jest.mock('react-native-create-thumbnail', () => ({
   createThumbnail: jest.fn(),
 }));
 
+jest.mock('react-native-compressor', () => ({
+  Image: { compress: jest.fn((path: string) => Promise.resolve(path)) },
+  Video: { compress: jest.fn((path: string) => Promise.resolve(path)) },
+}));
+
 jest.mock('@react-native-camera-roll/camera-roll', () => ({
   CameraRoll: {
     save: jest.fn(() => Promise.resolve('file:///tmp/photo.jpg')),

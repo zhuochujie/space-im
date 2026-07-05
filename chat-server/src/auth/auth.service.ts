@@ -26,7 +26,7 @@ export class AuthService {
     const userID = await this.reserveUser(phoneNumber, passwordHash);
 
     try {
-      await this.openImService.registerUser(userID, nickname ?? phoneNumber);
+      await this.openImService.registerUser(userID, nickname);
       await this.usersRepository.activate(userID);
     } catch (error) {
       await this.usersRepository.deletePending(userID);

@@ -191,13 +191,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-openim_client/Pods-openim_client-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-openim_client/Pods-openim_client-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -234,13 +230,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-openim_client/Pods-openim_client-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-openim_client/Pods-openim_client-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -268,7 +260,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 27MR6LV37D;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = openim_client/Info.plist;
@@ -277,7 +269,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.2;
+				MARKETING_VERSION = 1.1.5;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -301,7 +293,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 27MR6LV37D;
 				INFOPLIST_FILE = openim_client/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -309,7 +301,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1.2;
+				MARKETING_VERSION = 1.1.5;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

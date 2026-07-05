@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -16,6 +16,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 
 import { Avatar } from '../components/Avatar';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
+import { getAppVersion } from '../native/SpaceAppUpdate';
 import { colors } from '../theme/colors';
 import {
   avatarPickerOptions,
@@ -61,6 +62,15 @@ export function ProfileScreen({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [appVersion, setAppVersion] = useState('1.1.5 (7)');
+
+  useEffect(() => {
+    getAppVersion()
+      .then(version => {
+        setAppVersion(`${version.versionName} (${version.versionCode})`);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const closePasswordModal = () => {
     if (saving) {
@@ -262,6 +272,7 @@ export function ProfileScreen({
       >
         <Text style={styles.logoutText}>退出登录</Text>
       </Pressable>
+      <Text style={styles.appVersion}>SPACE IM {appVersion}</Text>
       <Modal
         animationType="fade"
         onRequestClose={closeProfileModal}
@@ -485,6 +496,12 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   logoutText: { color: colors.danger, fontSize: 15, fontWeight: '700' },
+  appVersion: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 18,
+    textAlign: 'center',
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(23, 32, 51, 0.45)',

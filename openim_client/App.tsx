@@ -269,8 +269,12 @@ function AppContent() {
   };
 
   const register = async (credentials: AuthCredentials) => {
-    if (!credentials.phoneNumber || !credentials.password) {
-      showToast('请输入账号和密码');
+    if (
+      !credentials.phoneNumber ||
+      !credentials.password ||
+      !credentials.nickname?.trim()
+    ) {
+      showToast('请填写手机号、昵称和密码');
       return;
     }
     if (!phoneNumberValid(credentials.phoneNumber)) {

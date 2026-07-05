@@ -82,20 +82,21 @@ Content-Type: application/json
 ```json
 {
   "phoneNumber": "18888888888",
+  "nickname": "SPACE 用户",
   "password": "password123"
 }
 ```
 
-`platformID` 不需要在注册时传入。注册成功后，服务会在 MongoDB 保存 Argon2id
-密码哈希，并把用户同步注册到 OpenIM。由于 OpenIM 注册用户时昵称不能为空，
-未传昵称时会使用手机号作为默认昵称。
+`nickname` 为必填项，长度为 1-32 个字符。`platformID` 不需要在注册时传入。
+注册成功后，服务会在 MongoDB 保存 Argon2id 密码哈希，并使用该昵称把用户同步
+注册到 OpenIM。
 
 请求示例：
 
 ```bash
 curl -X POST http://localhost:3000/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"phoneNumber":"13800138000","password":"password123"}'
+  -d '{"phoneNumber":"13800138000","nickname":"SPACE 用户","password":"password123"}'
 ```
 
 成功响应：

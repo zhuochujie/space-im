@@ -1526,6 +1526,29 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-compressor (2.0.2):
+    - hermes-engine
+    - NitroModules
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-create-thumbnail (2.2.0):
     - React-Core
   - react-native-image-picker (8.2.1):
@@ -2155,6 +2178,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - React-mutationobservernativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver`)
   - "react-native-cameraroll (from `../node_modules/@react-native-camera-roll/camera-roll`)"
+  - react-native-compressor (from `../node_modules/react-native-compressor`)
   - react-native-create-thumbnail (from `../node_modules/react-native-create-thumbnail`)
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
@@ -2294,6 +2318,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver"
   react-native-cameraroll:
     :path: "../node_modules/@react-native-camera-roll/camera-roll"
+  react-native-compressor:
+    :path: "../node_modules/react-native-compressor"
   react-native-create-thumbnail:
     :path: "../node_modules/react-native-create-thumbnail"
   react-native-image-picker:
@@ -2428,6 +2454,7 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: 2eb3f49d0d8e77b5343455eccd057010b8d38b6b
   React-mutationobservernativemodule: f0a0d5ae9b51caf7becbeabf836d716cfedb6bf2
   react-native-cameraroll: 4d4fcff8a057235ce7a9f57d4566409207216a86
+  react-native-compressor: f37f52bba422e2d4ae74658218447c0e26b4bb40
   react-native-create-thumbnail: c15cedc37f3822777d44e6035be041f7961341ea
   react-native-image-picker: 23540feacc79c63c60857f318fdfa8477c26e70a
   react-native-safe-area-context: fb5c8ee9f6dd62ef710611b3d370c501f42a4ac0

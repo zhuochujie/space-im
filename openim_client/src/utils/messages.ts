@@ -13,6 +13,19 @@ type NotificationUser = {
 const userName = (user?: NotificationUser) =>
   user?.nickname || user?.userID || '用户';
 
+const muteDurationText = (seconds: number) => {
+  if (seconds % 86400 === 0) {
+    return `${seconds / 86400} 天`;
+  }
+  if (seconds % 3600 === 0) {
+    return `${seconds / 3600} 小时`;
+  }
+  if (seconds % 60 === 0) {
+    return `${seconds / 60} 分钟`;
+  }
+  return `${seconds} 秒`;
+};
+
 export const isSystemNotificationMessage = (message: MessageItem) =>
   message.notificationElem !== undefined;
 
@@ -46,6 +59,14 @@ const notificationText = (message: MessageItem) => {
       }
       case MessageType.GroupDismissed:
         return `${userName(detail.opUser)}解散了群聊`;
+      case MessageType.GroupMemberMuted:
+        return `${userName(detail.opUser)}将${userName(
+          detail.mutedUser,
+        )}禁言 ${muteDurationText(detail.mutedSeconds || 0)}`;
+      case MessageType.GroupMemberCancelMuted:
+        return `${userName(detail.opUser)}解除了${userName(
+          detail.mutedUser,
+        )}的禁言`;
       case MessageType.GroupNameUpdated:
         return `${userName(detail.opUser)}将群名修改为“${
           detail.group?.groupName || ''

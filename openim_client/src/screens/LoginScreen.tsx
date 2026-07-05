@@ -29,6 +29,7 @@ const passwordValid = (password: string) => password.length >= 6;
 export function LoginScreen({ busy, onLogin, onRegister }: Props) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const actionText = mode === 'login' ? '登录' : '注册并登录';
@@ -46,6 +47,15 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
       showToast('密码至少 6 位');
       return;
     }
+    const nextNickname = nickname.trim();
+    if (mode === 'register' && !nextNickname) {
+      showToast('请输入昵称');
+      return;
+    }
+    if (mode === 'register' && nextNickname.length > 32) {
+      showToast('昵称最多 32 个字符');
+      return;
+    }
     if (mode === 'register' && password !== confirmPassword) {
       showToast('两次密码不一致');
       return;
@@ -53,6 +63,7 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
     const credentials = {
       phoneNumber: nextPhoneNumber,
       password,
+      ...(mode === 'register' ? { nickname: nextNickname } : {}),
     };
     return mode === 'login' ? onLogin(credentials) : onRegister(credentials);
   };
@@ -116,6 +127,14 @@ export function LoginScreen({ busy, onLogin, onRegister }: Props) {
             placeholder="请输入手机号码"
             value={phoneNumber}
           />
+          {mode === 'register' && (
+            <FormField
+              label="昵称"
+              onChangeText={setNickname}
+              placeholder="请输入昵称"
+              value={nickname}
+            />
+          )}
           <FormField
             label="密码"
             onChangeText={setPassword}

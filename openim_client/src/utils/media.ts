@@ -1,6 +1,7 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import RNFS from 'react-native-fs';
+import { Image, Video } from 'react-native-compressor';
 import type { Asset, ImageLibraryOptions } from 'react-native-image-picker';
 
 import { cacheResource } from './resourceCache';
@@ -55,6 +56,44 @@ export const localMediaPath = async (
     return destination;
   }
   return decodeURI(uri.replace(/^file:\/\//, ''));
+};
+
+const localPath = (uri: string) => decodeURI(uri.replace(/^file:\/\//, ''));
+
+const fileSize = async (path: string) => Number((await RNFS.stat(path)).size);
+
+export const compressMediaForSend = async (
+  path: string,
+  type: 'photo' | 'video',
+) => {
+  try {
+    const compressedUri =
+      type === 'photo'
+        ? await Image.compress(mediaUri(path), {
+            compressionMethod: 'manual',
+            maxHeight: 1280,
+            maxWidth: 1280,
+            output: 'jpg',
+            quality: 0.65,
+          })
+        : await Video.compress(mediaUri(path), {
+            bitrate: 800_000,
+            compressionMethod: 'manual',
+            maxSize: 540,
+            minimumFileSizeForCompress: 0,
+          });
+    const compressedPath = localPath(compressedUri);
+    if (
+      compressedPath === path ||
+      (await fileSize(compressedPath)) < (await fileSize(path))
+    ) {
+      return compressedPath;
+    }
+    RNFS.unlink(compressedPath).catch(() => undefined);
+  } catch {
+    // Compression failure should not prevent the original media from sending.
+  }
+  return path;
 };
 
 const cacheMediaExtension = (uri: string, fallback: string) => {

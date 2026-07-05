@@ -18,6 +18,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -31,6 +32,7 @@ import OpenIMSDK, {
   GroupMemberFilter,
   GroupJoinSource,
   GroupMemberRole,
+  GroupStatus,
   MessageStatus,
   OpenIMEvent,
   SessionType,
@@ -55,10 +57,11 @@ import { GroupQrModal } from '../components/GroupQrModal';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
 import { colors } from '../theme/colors';
 import type { ChatTarget } from '../types/app';
-import { copyMessageText } from '../utils/clipboard';
+import { copyMessageText, copyText } from '../utils/clipboard';
 import { groupMemberRoleText } from '../utils/group';
 import {
   avatarPickerOptions,
+  compressMediaForSend,
   fileExtension,
   localMediaPath,
   mediaUri,
@@ -72,6 +75,15 @@ import { requestRecordPermission, voiceDurationText } from '../utils/voice';
 const GROUP_MEMBER_PREVIEW_COUNT = 7;
 const GROUP_MEMBER_PAGE_SIZE = 50;
 const MODAL_DISMISS_DELAY_MS = 280;
+const MEMBER_MUTE_OPTIONS = [
+  { label: '10 分钟', seconds: 10 * 60 },
+  { label: '1 小时', seconds: 60 * 60 },
+  { label: '1 天', seconds: 24 * 60 * 60 },
+  { label: '7 天', seconds: 7 * 24 * 60 * 60 },
+];
+
+const muteEndTimeMs = (value: number) =>
+  value > 0 && value < 1_000_000_000_000 ? value * 1000 : value;
 
 const waitForModalDismiss = () =>
   new Promise<void>(resolve => {
@@ -148,8 +160,10 @@ export function ChatScreen({
     group,
   );
   const [selectedMember, setSelectedMember] = useState<GroupMemberItem>();
+  const [selfGroupMember, setSelfGroupMember] = useState<GroupMemberItem>();
   const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [kickConfirmationVisible, setKickConfirmationVisible] = useState(false);
+  const [muteOptionsVisible, setMuteOptionsVisible] = useState(false);
   const [inviteVisible, setInviteVisible] = useState(false);
   const [inviteClosing, setInviteClosing] = useState(false);
   const [visibleInviteCandidates, setVisibleInviteCandidates] = useState<
@@ -175,6 +189,7 @@ export function ChatScreen({
   const [groupAvatarDraftContentType, setGroupAvatarDraftContentType] =
     useState('');
   const [saving, setSaving] = useState(false);
+  const [muteClock, refreshMuteState] = useState(0);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voiceMode, setVoiceMode] = useState(false);
@@ -189,11 +204,32 @@ export function ChatScreen({
   const isGroupActive =
     !isGroupChat || (Boolean(group) && !target.isNotInGroup);
   const currentGroup = groupProfile || group;
-  const canSendMessage = !isGroupChat || isGroupActive;
   const isGroupOwner = isGroupChat && currentGroup?.ownerUserID === selfUserID;
   const selfGroupRole = isGroupOwner
     ? GroupMemberRole.Owner
-    : groupMembers.find(member => member.userID === selfUserID)?.roleLevel;
+    : selfGroupMember?.roleLevel ??
+      groupMembers.find(member => member.userID === selfUserID)?.roleLevel;
+  const isGroupMuted = currentGroup?.status === GroupStatus.Muted;
+  const selfMuteEndTime = muteEndTimeMs(
+    selfGroupMember?.muteEndTime ??
+      groupMembers.find(member => member.userID === selfUserID)?.muteEndTime ??
+      0,
+  );
+  const isSelfMuted = selfMuteEndTime > Date.now();
+  const isGroupMuteExempt =
+    selfGroupRole === GroupMemberRole.Owner ||
+    selfGroupRole === GroupMemberRole.Admin;
+  const isSendRestricted =
+    isSelfMuted || (isGroupMuted && !isGroupMuteExempt);
+  const canSendMessage =
+    !isGroupChat || (isGroupActive && !isSendRestricted);
+  const sendRestrictionText = !isGroupActive
+    ? '你已不在该群聊中'
+    : isSelfMuted
+    ? '你已被禁言'
+    : isGroupMuted && !isGroupMuteExempt
+    ? '全员禁言中'
+    : '输入消息';
   const canEditGroupInfo =
     isGroupChat &&
     isGroupActive &&
@@ -209,6 +245,11 @@ export function ChatScreen({
     (selfGroupRole === GroupMemberRole.Owner ||
       (selfGroupRole === GroupMemberRole.Admin &&
         selectedMember?.roleLevel === GroupMemberRole.Normal));
+  const canMuteSelectedMember = canKickSelectedMember;
+  const selectedMuteEndTime = muteEndTimeMs(
+    selectedMember?.muteEndTime ?? 0,
+  );
+  const isSelectedMemberMuted = selectedMuteEndTime > Date.now();
   const displayedMessages = useMemo(() => [...messages].reverse(), [messages]);
   const selectedMemberFriend = selectedMember
     ? friends.find(item => item.userID === selectedMember.userID)
@@ -340,6 +381,21 @@ export function ChatScreen({
   useEffect(() => {
     setGroupProfile(group);
   }, [group]);
+
+  useEffect(() => {
+    const now = Date.now();
+    const nextExpiry = [selfMuteEndTime, selectedMuteEndTime]
+      .filter(value => value > now)
+      .sort((left, right) => left - right)[0];
+    if (!nextExpiry) {
+      return;
+    }
+    const timer = setTimeout(
+      () => refreshMuteState(current => current + 1),
+      nextExpiry - now + 100,
+    );
+    return () => clearTimeout(timer);
+  }, [muteClock, selectedMuteEndTime, selfMuteEndTime]);
 
   const sendMessage = async (draft: MessageItem) => {
     appendMessages([{ ...draft, status: MessageStatus.Sending }]);
@@ -475,7 +531,7 @@ export function ChatScreen({
   };
 
   const retryMessage = async (message: MessageItem) => {
-    if (sending || message.status !== MessageStatus.Failed) {
+    if (sending || !canSendMessage || message.status !== MessageStatus.Failed) {
       return;
     }
     setSending(true);
@@ -497,7 +553,8 @@ export function ChatScreen({
 
     setSending(true);
     try {
-      const path = await localMediaPath(asset);
+      const originalPath = await localMediaPath(asset);
+      const path = await compressMediaForSend(originalPath, mediaType);
       const draft =
         mediaType === 'video'
           ? await (async () => {
@@ -509,7 +566,8 @@ export function ChatScreen({
               });
               return OpenIMSDK.createVideoMessageFromFullPath({
                 videoPath: path,
-                videoType: asset.type || 'video/mp4',
+                videoType:
+                  path === originalPath ? asset.type || 'video/mp4' : 'video/mp4',
                 duration: Math.ceil(asset.duration || 0),
                 snapshotPath: thumbnail.path.replace(/^file:\/\//, ''),
               });
@@ -1015,12 +1073,70 @@ export function ChatScreen({
       OpenIMSDK.getSpecifiedGroupsInfo([target.groupID]),
     ]);
     setGroupMembers(members);
+    setSelfGroupMember(
+      members.find(member => member.userID === selfUserID),
+    );
     if (groups[0]) {
       setGroupProfile(groups[0]);
     }
     setGroupMemberCount(groups[0]?.memberCount ?? members.length);
     return members;
-  }, [target.groupID]);
+  }, [selfUserID, target.groupID]);
+
+  useEffect(() => {
+    if (!isGroupChat || !target.groupID) {
+      setSelfGroupMember(undefined);
+      return;
+    }
+    let active = true;
+    Promise.all([
+      OpenIMSDK.getSpecifiedGroupsInfo([target.groupID]),
+      OpenIMSDK.getSpecifiedGroupMembersInfo({
+        groupID: target.groupID,
+        userIDList: [selfUserID],
+      }),
+    ])
+      .then(([groups, members]) => {
+        if (!active) {
+          return;
+        }
+        if (groups[0]) {
+          setGroupProfile(groups[0]);
+        }
+        setSelfGroupMember(members[0]);
+      })
+      .catch(() => undefined);
+
+    const groupInfoChanged = (changedGroup: GroupItem) => {
+      if (changedGroup.groupID === target.groupID) {
+        setGroupProfile(current => ({
+          ...(current || group),
+          ...changedGroup,
+        }));
+      }
+    };
+    const memberInfoChanged = (member: GroupMemberItem) => {
+      if (member.groupID !== target.groupID) {
+        return;
+      }
+      if (member.userID === selfUserID) {
+        setSelfGroupMember(member);
+      }
+      setSelectedMember(current =>
+        current?.userID === member.userID ? member : current,
+      );
+      setGroupMembers(current =>
+        current.map(item => (item.userID === member.userID ? member : item)),
+      );
+    };
+    OpenIMSDK.on(OpenIMEvent.OnGroupInfoChanged, groupInfoChanged);
+    OpenIMSDK.on(OpenIMEvent.OnGroupMemberInfoChanged, memberInfoChanged);
+    return () => {
+      active = false;
+      OpenIMSDK.off(OpenIMEvent.OnGroupInfoChanged, groupInfoChanged);
+      OpenIMSDK.off(OpenIMEvent.OnGroupMemberInfoChanged, memberInfoChanged);
+    };
+  }, [group, isGroupChat, selfUserID, target.groupID]);
 
   const loadGroupMemberPage = async (offset: number, reset = false) => {
     if (
@@ -1087,6 +1203,9 @@ export function ChatScreen({
       setSelectedMember(current =>
         current?.userID === member.userID ? member : current,
       );
+      if (member.userID === selfUserID) {
+        setSelfGroupMember(member);
+      }
       loadGroupMembers().catch(() => undefined);
     };
     const removeMember = (member: GroupMemberItem) => {
@@ -1143,6 +1262,7 @@ export function ChatScreen({
     isGroupChat,
     loadGroupMembers,
     selectedMember?.userID,
+    selfUserID,
     settingsVisible,
     target.groupID,
   ]);
@@ -1177,6 +1297,7 @@ export function ChatScreen({
     setMemberModalVisible(false);
     setSelectedMember(undefined);
     setKickConfirmationVisible(false);
+    setMuteOptionsVisible(false);
     setSelectedInviteUserIDs([]);
     setRemarkModalVisible(false);
     setGroupInfoModalVisible(false);
@@ -1231,6 +1352,10 @@ export function ChatScreen({
           return true;
         }
         if (memberModalVisible) {
+          if (muteOptionsVisible) {
+            setMuteOptionsVisible(false);
+            return true;
+          }
           setKickConfirmationVisible(false);
           setMemberModalVisible(false);
           return true;
@@ -1260,6 +1385,7 @@ export function ChatScreen({
     memberModalVisible,
     mediaPickerVisible,
     mentionPickerVisible,
+    muteOptionsVisible,
     onBack,
     pendingSaveMedia,
     previewImage,
@@ -1293,7 +1419,18 @@ export function ChatScreen({
   const openMemberDetails = (member: GroupMemberItem) => {
     setSelectedMember(member);
     setKickConfirmationVisible(false);
+    setMuteOptionsVisible(false);
     setMemberModalVisible(true);
+    OpenIMSDK.getSpecifiedGroupMembersInfo({
+      groupID: target.groupID,
+      userIDList: [member.userID],
+    })
+      .then(members => {
+        if (members[0]) {
+          setSelectedMember(members[0]);
+        }
+      })
+      .catch(() => undefined);
   };
 
   const openMessageSenderDetails = (message: MessageItem) => {
@@ -1330,6 +1467,7 @@ export function ChatScreen({
       return;
     }
     setKickConfirmationVisible(false);
+    setMuteOptionsVisible(false);
     setMemberModalVisible(false);
   };
 
@@ -1381,6 +1519,76 @@ export function ChatScreen({
         ),
       );
       showToast(nextRole === GroupMemberRole.Admin ? '已设为管理员' : '已撤销');
+    } catch {
+      showToast('操作失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleGroupMute = async (isMute: boolean) => {
+    if (saving || !canEditGroupInfo) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await OpenIMSDK.changeGroupMute({
+        groupID: target.groupID,
+        isMute,
+      });
+      const [updatedGroup] = await OpenIMSDK.getSpecifiedGroupsInfo([
+        target.groupID,
+      ]).catch(() => []);
+      setGroupProfile(current => ({
+        ...(current || group),
+        ...(updatedGroup || {}),
+        status: isMute ? GroupStatus.Muted : GroupStatus.Normal,
+      }));
+      showToast(isMute ? '已开启全员禁言' : '已关闭全员禁言');
+    } catch {
+      showToast('操作失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeSelectedMemberMute = async (mutedSeconds: number) => {
+    if (!selectedMember || saving || !canMuteSelectedMember) {
+      return;
+    }
+    const member = selectedMember;
+    setSaving(true);
+    try {
+      await OpenIMSDK.changeGroupMemberMute({
+        groupID: target.groupID,
+        userID: member.userID,
+        mutedSeconds,
+      });
+      const [updatedMember] =
+        await OpenIMSDK.getSpecifiedGroupMembersInfo({
+          groupID: target.groupID,
+          userIDList: [member.userID],
+        }).catch(() => []);
+      const nextMember =
+        updatedMember ||
+        ({
+          ...member,
+          muteEndTime:
+            mutedSeconds > 0 ? Date.now() + mutedSeconds * 1000 : 0,
+        } as GroupMemberItem);
+      setSelectedMember(nextMember);
+      setGroupMembers(current =>
+        current.map(item =>
+          item.userID === nextMember.userID ? nextMember : item,
+        ),
+      );
+      setAllGroupMembers(current =>
+        current.map(item =>
+          item.userID === nextMember.userID ? nextMember : item,
+        ),
+      );
+      setMuteOptionsVisible(false);
+      showToast(mutedSeconds > 0 ? '已禁言' : '已解除禁言');
     } catch {
       showToast('操作失败');
     } finally {
@@ -1466,7 +1674,7 @@ export function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.page}
     >
       <View style={styles.header}>
@@ -1749,7 +1957,7 @@ export function ChatScreen({
               editable={canSendMessage}
               onChangeText={handleTextChange}
               onSubmitEditing={sendText}
-              placeholder={canSendMessage ? '输入消息' : '你已不在该群聊中'}
+              placeholder={sendRestrictionText}
               placeholderTextColor="#9AA4B4"
               returnKeyType="send"
               style={styles.composerInput}
@@ -2018,9 +2226,29 @@ export function ChatScreen({
                   <Text style={styles.profileID}>昵称：{friend.nickname}</Text>
                 ) : null}
                 {isGroupChat ? (
-                  <Text style={styles.profileID}>
-                    {groupMemberCount} 位成员
-                  </Text>
+                  <>
+                    <Pressable
+                      accessibilityLabel="复制群号"
+                      hitSlop={6}
+                      onPress={() => copyText(target.groupID, '群号已复制')}
+                      style={styles.groupIDRow}
+                    >
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.profileID, styles.groupIDText]}
+                      >
+                        群号：{target.groupID}
+                      </Text>
+                      <MaterialCommunityIcons
+                        color={colors.muted}
+                        name="content-copy"
+                        size={15}
+                      />
+                    </Pressable>
+                    <Text style={styles.profileID}>
+                      {groupMemberCount} 位成员
+                    </Text>
+                  </>
                 ) : (
                   <Text style={styles.relationshipText}>
                     {friend ? '已添加为好友' : '还不是好友'}
@@ -2071,6 +2299,26 @@ export function ChatScreen({
                       size={21}
                     />
                   </Pressable>
+                  {canEditGroupInfo && (
+                    <View style={styles.groupMuteRow}>
+                      <View style={styles.groupMuteTextWrap}>
+                        <Text style={styles.groupQrText}>全员禁言</Text>
+                        <Text style={styles.groupMuteDescription}>
+                          普通成员将无法发送消息
+                        </Text>
+                      </View>
+                      <Switch
+                        accessibilityLabel="全员禁言"
+                        disabled={saving}
+                        onValueChange={toggleGroupMute}
+                        trackColor={{
+                          false: colors.border,
+                          true: colors.primary,
+                        }}
+                        value={isGroupMuted}
+                      />
+                    </View>
+                  )}
                 </View>
                 <View style={styles.infoSection}>
                   <View style={styles.sectionHeader}>
@@ -2526,6 +2774,12 @@ export function ChatScreen({
                       : '未添加'}
                   </Text>
                 </View>
+                <View style={styles.memberDetailRoleRow}>
+                  <Text style={styles.memberDetailRoleLabel}>禁言状态</Text>
+                  <Text style={styles.memberDetailRoleValue}>
+                    {isSelectedMemberMuted ? '已禁言' : '未禁言'}
+                  </Text>
+                </View>
                 {canManageSelectedMemberRole && (
                   <Pressable
                     disabled={saving || kickConfirmationVisible}
@@ -2543,6 +2797,33 @@ export function ChatScreen({
                         {selectedMember.roleLevel === GroupMemberRole.Admin
                           ? '撤销管理员'
                           : '设为管理员'}
+                      </Text>
+                    )}
+                  </Pressable>
+                )}
+                {canMuteSelectedMember && (
+                  <Pressable
+                    disabled={
+                      saving || kickConfirmationVisible || muteOptionsVisible
+                    }
+                    onPress={() =>
+                      isSelectedMemberMuted
+                        ? changeSelectedMemberMute(0)
+                        : setMuteOptionsVisible(true)
+                    }
+                    style={[
+                      styles.memberMuteButton,
+                      (saving ||
+                        kickConfirmationVisible ||
+                        muteOptionsVisible) &&
+                        styles.modalButtonDisabled,
+                    ]}
+                  >
+                    {saving && !kickConfirmationVisible ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.modalButtonText}>
+                        {isSelectedMemberMuted ? '解除禁言' : '设置禁言'}
                       </Text>
                     )}
                   </Pressable>
@@ -2606,6 +2887,41 @@ export function ChatScreen({
                           )}
                         </Pressable>
                       </View>
+                    </View>
+                  </Pressable>
+                )}
+                {muteOptionsVisible && (
+                  <Pressable
+                    onPress={() => undefined}
+                    style={styles.memberConfirmationOverlay}
+                  >
+                    <View style={styles.memberConfirmationCard}>
+                      <Text style={styles.memberConfirmationTitle}>
+                        设置禁言时长
+                      </Text>
+                      <View style={styles.muteOptionsList}>
+                        {MEMBER_MUTE_OPTIONS.map(option => (
+                          <Pressable
+                            key={option.seconds}
+                            disabled={saving}
+                            onPress={() =>
+                              changeSelectedMemberMute(option.seconds)
+                            }
+                            style={styles.muteOptionButton}
+                          >
+                            <Text style={styles.muteOptionText}>
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <Pressable
+                        disabled={saving}
+                        onPress={() => setMuteOptionsVisible(false)}
+                        style={styles.muteOptionsCancel}
+                      >
+                        <Text style={styles.inviteCancelText}>取消</Text>
+                      </Pressable>
                     </View>
                   </Pressable>
                 )}
@@ -3104,6 +3420,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  groupIDRow: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  groupIDText: { flexShrink: 1 },
   relationshipText: {
     color: colors.primary,
     fontSize: 12,
@@ -3170,6 +3493,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
+  groupMuteRow: {
+    minHeight: 62,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: 8,
+  },
+  groupMuteTextWrap: { flex: 1, marginRight: 12 },
+  groupMuteDescription: { color: colors.muted, fontSize: 12, marginTop: 4 },
   groupMemberGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -3397,6 +3731,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 8,
   },
+  memberMuteButton: {
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
   memberKickButton: {
     width: '100%',
     height: 44,
@@ -3465,6 +3808,23 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     backgroundColor: '#E5484D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  muteOptionsList: { width: '100%', gap: 8, marginVertical: 16 },
+  muteOptionButton: {
+    height: 42,
+    borderRadius: 11,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  muteOptionText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  muteOptionsCancel: {
+    width: '100%',
+    height: 42,
+    borderRadius: 11,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
