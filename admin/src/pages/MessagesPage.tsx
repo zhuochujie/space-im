@@ -25,13 +25,28 @@ export function MessagesPage({
   setNotice,
 }: PageProps) {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [page, setPage] = useState(1)
   const [rawResult, setRawResult] = useState<unknown>(null)
   const rows = useMemo(() => extractMessages(rawResult), [rawResult])
   const total = useMemo(() => extractMessageTotal(rawResult), [rawResult])
   const hasSearched = rawResult !== null
+  const pageSize = parsePositiveInt(filters.count, 50)
+  const totalPages = total === null ? null : Math.max(1, Math.ceil(total / pageSize))
+  const canGoPrevious = page > 1 && !loading
+  const canGoNext =
+    !loading &&
+    (totalPages === null ? rows.length >= pageSize : page < totalPages)
 
   async function searchMessages(event: FormEvent) {
     event.preventDefault()
+    await loadMessages(1)
+  }
+
+  async function changePage(nextPage: number) {
+    await loadMessages(nextPage)
+  }
+
+  async function loadMessages(nextPage: number) {
     setLoading(true)
     setNotice('')
     try {
@@ -41,10 +56,12 @@ export function MessagesPage({
           params.set(key, value.trim())
         }
       })
+      params.set('page', String(nextPage))
       const data = await request<unknown>(
         `/admin/messages?${params.toString()}`,
       )
       setRawResult(data)
+      setPage(nextPage)
       setNotice('聊天记录查询完成')
     } catch (err) {
       setError(getErrorMessage(err))
@@ -107,9 +124,29 @@ export function MessagesPage({
       {hasSearched && (
         <div className="resultSummary">
           <span>
-            {total === null ? '当前显示' : `共 ${total} 条，当前显示`}{' '}
+            {total === null
+              ? `第 ${page} 页，当前显示`
+              : `共 ${total} 条，第 ${page}/${totalPages} 页，当前显示`}{' '}
             {rows.length} 条
           </span>
+          <div className="pager">
+            <button
+              className="secondary"
+              type="button"
+              disabled={!canGoPrevious}
+              onClick={() => void changePage(page - 1)}
+            >
+              上一页
+            </button>
+            <button
+              className="secondary"
+              type="button"
+              disabled={!canGoNext}
+              onClick={() => void changePage(page + 1)}
+            >
+              下一页
+            </button>
+          </div>
           {total !== null && total > 0 && rows.length === 0 && (
             <span className="muted">
               OpenIM 返回了总数，但当前页没有聊天记录，请调整筛选条件后重试
@@ -158,4 +195,9 @@ export function MessagesPage({
       </pre>
     </section>
   )
+}
+
+function parsePositiveInt(value: string, fallback: number): number {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }

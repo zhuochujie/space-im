@@ -220,6 +220,22 @@
   font-weight: 700;
 }
 
+.pager {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pager button {
+  min-width: 78px;
+}
+
+.pagerBottom {
+  justify-content: flex-end;
+  margin-top: 12px;
+  width: 100%;
+}
+
 .muted {
   color: #94a3b8;
   font-weight: 600;

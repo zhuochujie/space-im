@@ -2,7 +2,7 @@ import type { MessageRow } from '../types'
 
 export function extractMessages(value: unknown): MessageRow[] {
   if (Array.isArray(value)) {
-    return value.map(unwrapMessageRow).filter(isMessageRow)
+    return sortMessagesDescending(value.map(unwrapMessageRow).filter(isMessageRow))
   }
   if (!value || typeof value !== 'object') {
     return []
@@ -23,6 +23,21 @@ export function extractMessages(value: unknown): MessageRow[] {
     }
   }
   return []
+}
+
+function sortMessagesDescending(rows: MessageRow[]): MessageRow[] {
+  return [...rows].sort((left, right) => {
+    const leftTime = normalizeMessageTime(left.sendTime)
+    const rightTime = normalizeMessageTime(right.sendTime)
+    return rightTime - leftTime
+  })
+}
+
+function normalizeMessageTime(value?: number): number {
+  if (!value) {
+    return 0
+  }
+  return value < 10_000_000_000 ? value * 1000 : value
 }
 
 export function extractMessageTotal(value: unknown): number | null {

@@ -49,11 +49,23 @@ export function GroupsPage({
   const [members, setMembers] = useState<AdminGroupMember[]>([])
   const [memberTotal, setMemberTotal] = useState<number | null>(null)
   const [rawMessages, setRawMessages] = useState<unknown>(null)
+  const [messagePage, setMessagePage] = useState(1)
   const messageRows = useMemo(() => extractMessages(rawMessages), [rawMessages])
   const messageTotal = useMemo(
     () => extractMessageTotal(rawMessages),
     [rawMessages],
   )
+  const messagePageSize = parsePositiveInt(messageFilters.count, 50)
+  const messageTotalPages =
+    messageTotal === null
+      ? null
+      : Math.max(1, Math.ceil(messageTotal / messagePageSize))
+  const canGoPreviousMessagePage = messagePage > 1 && !loading
+  const canGoNextMessagePage =
+    !loading &&
+    (messageTotalPages === null
+      ? messageRows.length >= messagePageSize
+      : messagePage < messageTotalPages)
 
   async function searchGroup(event: FormEvent) {
     event.preventDefault()
@@ -109,7 +121,10 @@ export function GroupsPage({
       setSelectedGroup(data.group)
       setGroupFilters((current) => ({ ...current, groupID: data.group!.groupID }))
       setNotice('群信息查询完成')
-      await Promise.all([loadMembers(data.group.groupID), loadMessages(data.group.groupID)])
+      await Promise.all([
+        loadMembers(data.group.groupID),
+        fetchGroupMessages(data.group.groupID, 1),
+      ])
     } catch (err) {
       setError(getErrorMessage(err))
     } finally {
@@ -144,7 +159,7 @@ export function GroupsPage({
     setLoading(true)
     setNotice('')
     try {
-      await loadMessages(selectedGroup.groupID)
+      await fetchGroupMessages(selectedGroup.groupID, 1)
       setNotice('群消息查询完成')
     } catch (err) {
       setError(getErrorMessage(err))
@@ -166,17 +181,36 @@ export function GroupsPage({
     setMemberTotal(data.total)
   }
 
-  async function loadMessages(groupID: string) {
+  async function fetchGroupMessages(groupID: string, nextPage: number) {
     const params = new URLSearchParams()
     Object.entries(messageFilters).forEach(([key, value]) => {
       if (value.trim()) {
         params.set(key, value.trim())
       }
     })
+    params.set('page', String(nextPage))
     const data = await request<unknown>(
       `/admin/groups/${encodeURIComponent(groupID)}/messages?${params.toString()}`,
     )
     setRawMessages(data)
+    setMessagePage(nextPage)
+  }
+
+  async function changeMessagePage(nextPage: number) {
+    if (!selectedGroup) {
+      setError('请先选择群')
+      return
+    }
+    setLoading(true)
+    setNotice('')
+    try {
+      await fetchGroupMessages(selectedGroup.groupID, nextPage)
+      setNotice('群消息查询完成')
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setLoading(false)
+    }
   }
 
   function updateGroupFilter(key: keyof typeof GROUP_FILTERS, value: string) {
@@ -358,8 +392,8 @@ export function GroupsPage({
               </div>
               <span className="muted">
                 {messageTotal === null
-                  ? `当前 ${messageRows.length} 条`
-                  : `共 ${messageTotal} 条`}
+                  ? `第 ${messagePage} 页，当前 ${messageRows.length} 条`
+                  : `共 ${messageTotal} 条，第 ${messagePage}/${messageTotalPages} 页`}
               </span>
             </div>
             <form
@@ -430,6 +464,24 @@ export function GroupsPage({
                 </tbody>
               </table>
             </div>
+            <div className="pager pagerBottom">
+              <button
+                className="secondary"
+                type="button"
+                disabled={!canGoPreviousMessagePage}
+                onClick={() => void changeMessagePage(messagePage - 1)}
+              >
+                上一页
+              </button>
+              <button
+                className="secondary"
+                type="button"
+                disabled={!canGoNextMessagePage}
+                onClick={() => void changeMessagePage(messagePage + 1)}
+              >
+                下一页
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -493,4 +545,9 @@ function formatMuteTime(value?: number): string {
   const now = Date.now()
   const time = value < 10_000_000_000 ? value * 1000 : value
   return time > now ? formatMessageTime(value) : '-'
+}
+
+function parsePositiveInt(value: string, fallback: number): number {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
