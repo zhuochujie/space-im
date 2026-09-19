@@ -313,6 +313,7 @@ Authorization: Bearer <token>
 `sessionType` 默认是 `1`（单聊），`3` 表示群聊。查询群聊时把群号放在 `recvID`，
 OpenIM 的 `SearchMessageReq` 没有 `groupID` 查询字段。OpenIM 常见返回字段为
 `chatLogs` 和 `chatLogsNum`，新版 `chatLogs` 每项为 `{ chatLog, isRevoked }`。
+OpenIM 原始查询按旧消息到新消息正序分页，后台接口会转换为新消息在前的倒序分页。
 
 ## App 更新：查询安卓最新版本
 
