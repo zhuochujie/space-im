@@ -2,7 +2,7 @@ import type { MessageRow } from '../types'
 
 export function extractMessages(value: unknown): MessageRow[] {
   if (Array.isArray(value)) {
-    return value.filter(isMessageRow)
+    return value.map(unwrapMessageRow).filter(isMessageRow)
   }
   if (!value || typeof value !== 'object') {
     return []
@@ -50,7 +50,13 @@ export function previewContent(content: unknown): string {
     return String(content)
   }
   const record = content as Record<string, unknown>
-  const text = record.content ?? record.text ?? record.description
+  const text =
+    record.text ??
+    record.content ??
+    record.description ??
+    getNestedText(record.textElem) ??
+    getNestedText(record.atTextElem) ??
+    getNestedText(record.quoteElem)
   if (typeof text === 'string') {
     return text
   }
@@ -63,6 +69,32 @@ function previewStringContent(content: string): string {
   } catch {
     return content
   }
+}
+
+function unwrapMessageRow(value: unknown): unknown {
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+  const record = value as Record<string, unknown>
+  const chatLog = record.chatLog ?? record.msgData ?? record.message
+  if (!chatLog || typeof chatLog !== 'object') {
+    return value
+  }
+  return {
+    ...(chatLog as Record<string, unknown>),
+    ...(typeof record.isRevoked === 'boolean'
+      ? { isRevoked: record.isRevoked }
+      : {}),
+  }
+}
+
+function getNestedText(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  const record = value as Record<string, unknown>
+  const text = record.content ?? record.text
+  return typeof text === 'string' ? text : undefined
 }
 
 function isMessageRow(value: unknown): value is MessageRow {

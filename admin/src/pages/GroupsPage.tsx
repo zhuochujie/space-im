@@ -411,9 +411,13 @@ export function GroupsPage({
                     messageRows.map((row, index) => (
                       <tr key={row.clientMsgID ?? index}>
                         <td>{formatMessageTime(row.sendTime)}</td>
-                        <td className="mono">{row.sendID || '-'}</td>
+                        <td className="mono">
+                          {row.senderNickname || row.sendID || '-'}
+                        </td>
                         <td>{row.contentType ?? '-'}</td>
-                        <td>{previewContent(row.content)}</td>
+                        <td>
+                          {row.isRevoked ? '已撤回' : previewContent(row.content)}
+                        </td>
                       </tr>
                     ))
                   ) : (

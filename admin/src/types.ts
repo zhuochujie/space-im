@@ -44,9 +44,13 @@ export interface MessageRow {
   sendID?: string
   recvID?: string
   groupID?: string
+  senderNickname?: string
+  recvNickname?: string
+  groupName?: string
   contentType?: number
   sendTime?: number
   content?: unknown
+  isRevoked?: boolean
 }
 
 export interface AdminGroup {

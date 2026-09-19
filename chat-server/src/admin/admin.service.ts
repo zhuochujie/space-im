@@ -114,7 +114,7 @@ export class AdminService {
     const page = query.page ?? 1;
     const count = query.count ?? 50;
     const body = removeEmptyValues({
-      groupID,
+      recvID: groupID,
       sendID: query.sendID,
       contentType: query.contentType,
       sessionType: 3,

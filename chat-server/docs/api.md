@@ -310,8 +310,9 @@ Authorization: Bearer <token>
 查询参数会映射到 OpenIM 消息查询接口。默认 OpenIM 路径为 `/msg/search_msg`，
 如当前 OpenIM 版本路径不同，可通过 `OPENIM_MESSAGE_SEARCH_PATH` 覆盖。当前支持
 `sendID`、`recvID`、`contentType`、`sessionType`、`page`、`count`。
-`sessionType` 默认是 `1`（单聊），`3` 表示群聊。OpenIM 常见返回字段为 `chatLogs`
-和 `chatLogsNum`。
+`sessionType` 默认是 `1`（单聊），`3` 表示群聊。查询群聊时把群号放在 `recvID`，
+OpenIM 的 `SearchMessageReq` 没有 `groupID` 查询字段。OpenIM 常见返回字段为
+`chatLogs` 和 `chatLogsNum`，新版 `chatLogs` 每项为 `{ chatLog, isRevoked }`。
 
 ## App 更新：查询安卓最新版本
 
