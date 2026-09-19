@@ -27,6 +27,7 @@ import { GroupQrScannerModal } from '../components/GroupQrScannerModal';
 import { colors } from '../theme/colors';
 import { parseGroupInviteValue } from '../utils/groupInvite';
 import { showConfirm, showToast } from '../utils/toast';
+import { parseUserInviteValue } from '../utils/userInvite';
 
 type Props = {
   friends: FriendUserItem[];
@@ -238,7 +239,7 @@ export function ContactsScreen({
       ? !groupName.trim()
       : !searchResult || Boolean(targetStatus));
 
-  const openGroupQrScanner = () => {
+  const openQrScanner = () => {
     if (submitting) {
       return;
     }
@@ -260,7 +261,7 @@ export function ContactsScreen({
     resetActionForm();
   };
 
-  const closeGroupQrScanner = useCallback(() => {
+  const closeQrScanner = useCallback(() => {
     setScannerVisible(false);
     if (Platform.OS !== 'ios') {
       setTimeout(() => setActionVisible(true), 250);
@@ -273,20 +274,27 @@ export function ContactsScreen({
     }
   }, []);
 
-  const handleGroupQrScanned = useCallback(
+  const handleQrScanned = useCallback(
     (value: string) => {
-      const groupID = parseGroupInviteValue(value);
-      if (!groupID) {
-        showToast('不是有效的 SPACE IM 群二维码');
+      const keyword =
+        action === 'friend'
+          ? parseUserInviteValue(value)
+          : parseGroupInviteValue(value);
+      if (!keyword) {
+        showToast(
+          action === 'friend'
+            ? '不是有效的 SPACE IM 用户二维码'
+            : '不是有效的 SPACE IM 群二维码',
+        );
         return false;
       }
-      setTargetID(groupID);
+      setTargetID(keyword);
       setSearchResult(undefined);
-      closeGroupQrScanner();
-      searchTarget(groupID);
+      closeQrScanner();
+      searchTarget(keyword);
       return true;
     },
-    [closeGroupQrScanner, searchTarget],
+    [action, closeQrScanner, searchTarget],
   );
 
   const confirmDeleteFriend = async (friend: FriendUserItem) => {
@@ -506,11 +514,15 @@ export function ContactsScreen({
                         />
                       )}
                     </Pressable>
-                    {action === 'join' ? (
+                    {action === 'friend' || action === 'join' ? (
                       <Pressable
-                        accessibilityLabel="扫描群二维码"
+                        accessibilityLabel={
+                          action === 'friend'
+                            ? '扫描用户二维码'
+                            : '扫描群二维码'
+                        }
                         disabled={submitting}
-                        onPress={openGroupQrScanner}
+                        onPress={openQrScanner}
                         style={[
                           styles.scanButton,
                           submitting && styles.submitButtonDisabled,
@@ -611,9 +623,10 @@ export function ContactsScreen({
         </KeyboardCenteredModal>
       </Modal>
       <GroupQrScannerModal
-        onClose={closeGroupQrScanner}
+        onClose={closeQrScanner}
         onDismiss={handleScannerDismiss}
-        onScanned={handleGroupQrScanned}
+        onScanned={handleQrScanned}
+        title={action === 'friend' ? '扫描用户二维码' : '扫描群二维码'}
         visible={scannerVisible}
       />
     </View>

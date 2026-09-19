@@ -11,8 +11,8 @@ type SpaceAppUpdateNative = {
 };
 
 const IOS_VERSION: NativeVersion = {
-  versionCode: 7,
-  versionName: '1.1.5',
+  versionCode: 13,
+  versionName: '1.1.11',
 };
 
 const nativeModule = NativeModules.SpaceAppUpdate as

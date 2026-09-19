@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import {
+  GetGroupMembersDto,
+  ListAdminGroupsDto,
   ListAdminUsersDto,
+  SearchGroupMessagesDto,
   SearchMessagesDto,
   SetUserStatusDto,
 } from './dto/admin.dto';
@@ -45,6 +48,76 @@ export class AdminService {
       recvID: query.recvID,
       contentType: query.contentType,
       sessionType: query.sessionType ?? 1,
+      pagination: {
+        pageNumber: page,
+        showNumber: count,
+      },
+    });
+    return this.openImService.searchMessages(body);
+  }
+
+  async listGroups(query: ListAdminGroupsDto) {
+    const page = query.page ?? 1;
+    const count = query.count ?? 50;
+    if (!query.userID) {
+      return { groups: [], total: 0, page, count };
+    }
+    const result = await this.openImService.getJoinedGroupList({
+      fromUserID: query.userID,
+      pagination: {
+        pageNumber: page,
+        showNumber: count,
+      },
+    });
+    return {
+      groups: result.groups ?? [],
+      total: result.total ?? null,
+      page,
+      count,
+    };
+  }
+
+  async getGroup(groupID: string) {
+    const result = await this.openImService.getGroupsInfo([groupID]);
+    return {
+      group: result.groupInfos?.[0] ?? null,
+    };
+  }
+
+  async getGroupMembers(groupID: string, query: GetGroupMembersDto) {
+    const page = query.page ?? 1;
+    const count = query.count ?? 50;
+    const body = removeEmptyValues({
+      groupID,
+      keyword: query.keyword,
+      filter: query.filter ?? 0,
+      pagination: {
+        pageNumber: page,
+        showNumber: count,
+      },
+    }) as {
+      groupID: string;
+      keyword?: string;
+      filter?: number;
+      pagination: { pageNumber: number; showNumber: number };
+    };
+    const result = await this.openImService.getGroupMemberList(body);
+    return {
+      members: result.members ?? [],
+      total: result.total ?? null,
+      page,
+      count,
+    };
+  }
+
+  searchGroupMessages(groupID: string, query: SearchGroupMessagesDto) {
+    const page = query.page ?? 1;
+    const count = query.count ?? 50;
+    const body = removeEmptyValues({
+      groupID,
+      sendID: query.sendID,
+      contentType: query.contentType,
+      sessionType: 3,
       pagination: {
         pageNumber: page,
         showNumber: count,

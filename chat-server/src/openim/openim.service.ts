@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  OpenImGroupMembersData,
+  OpenImGroupsData,
   OpenImResponse,
   OpenImTokenData,
   OpenImUsersData,
@@ -65,6 +67,41 @@ export class OpenImService {
     const token = await this.getAdminToken();
     const path = process.env.OPENIM_MESSAGE_SEARCH_PATH ?? '/msg/search_msg';
     return this.request<unknown>(path, body, token);
+  }
+
+  async getGroupsInfo(groupIDs: string[]): Promise<OpenImGroupsData> {
+    const token = await this.getAdminToken();
+    return this.request<OpenImGroupsData>(
+      '/group/get_groups_info',
+      { groupIDs },
+      token,
+    );
+  }
+
+  async getJoinedGroupList(body: {
+    fromUserID: string;
+    pagination: { pageNumber: number; showNumber: number };
+  }): Promise<OpenImGroupsData> {
+    const token = await this.getAdminToken();
+    return this.request<OpenImGroupsData>(
+      '/group/get_joined_group_list',
+      body,
+      token,
+    );
+  }
+
+  async getGroupMemberList(body: {
+    groupID: string;
+    keyword?: string;
+    filter?: number;
+    pagination: { pageNumber: number; showNumber: number };
+  }): Promise<OpenImGroupMembersData> {
+    const token = await this.getAdminToken();
+    return this.request<OpenImGroupMembersData>(
+      '/group/get_group_member_list',
+      body,
+      token,
+    );
   }
 
   private async getAdminToken(): Promise<string> {

@@ -12,7 +12,10 @@ import {
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AdminService } from './admin.service';
 import {
+  GetGroupMembersDto,
+  ListAdminGroupsDto,
   ListAdminUsersDto,
+  SearchGroupMessagesDto,
   ResetUserPasswordDto,
   SearchMessagesDto,
   SetUserStatusDto,
@@ -49,5 +52,31 @@ export class AdminController {
   @Get('messages')
   searchMessages(@Query() query: SearchMessagesDto) {
     return this.adminService.searchMessages(query);
+  }
+
+  @Get('groups')
+  listGroups(@Query() query: ListAdminGroupsDto) {
+    return this.adminService.listGroups(query);
+  }
+
+  @Get('groups/:groupID')
+  getGroup(@Param('groupID') groupID: string) {
+    return this.adminService.getGroup(groupID);
+  }
+
+  @Get('groups/:groupID/members')
+  getGroupMembers(
+    @Param('groupID') groupID: string,
+    @Query() query: GetGroupMembersDto,
+  ) {
+    return this.adminService.getGroupMembers(groupID, query);
+  }
+
+  @Get('groups/:groupID/messages')
+  searchGroupMessages(
+    @Param('groupID') groupID: string,
+    @Query() query: SearchGroupMessagesDto,
+  ) {
+    return this.adminService.searchGroupMessages(groupID, query);
   }
 }

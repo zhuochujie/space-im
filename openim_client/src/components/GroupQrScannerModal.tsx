@@ -21,6 +21,7 @@ type Props = {
   onClose: () => void;
   onDismiss?: () => void;
   onScanned: (value: string) => boolean;
+  title?: string;
   visible: boolean;
 };
 
@@ -28,6 +29,7 @@ export function GroupQrScannerModal({
   onClose,
   onDismiss,
   onScanned,
+  title = '扫描群二维码',
   visible,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -118,7 +120,7 @@ export function GroupQrScannerModal({
           >
             <MaterialCommunityIcons color="#FFFFFF" name="close" size={28} />
           </Pressable>
-          <Text style={styles.title}>扫描群二维码</Text>
+          <Text style={styles.title}>{title}</Text>
           <View style={styles.headerPlaceholder} />
         </View>
         <View

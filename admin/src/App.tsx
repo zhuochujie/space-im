@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AdminLayout } from './components/AdminLayout'
+import { GroupsPage } from './pages/GroupsPage'
 import { LoginPage } from './pages/LoginPage'
 import { MessagesPage } from './pages/MessagesPage'
 import { UpdatesPage } from './pages/UpdatesPage'
@@ -179,6 +180,14 @@ function App() {
           setNotice={setNotice}
           upload={upload}
         />
+      ) : route === 'groups' ? (
+        <GroupsPage
+          loading={loading}
+          request={request}
+          setError={setError}
+          setLoading={setLoading}
+          setNotice={setNotice}
+        />
       ) : route === 'messages' ? (
         <MessagesPage
           loading={loading}
@@ -201,6 +210,9 @@ function App() {
 }
 
 function readRoute(): RouteKey {
+  if (window.location.pathname.includes('/groups')) {
+    return 'groups'
+  }
   if (window.location.pathname.includes('/messages')) {
     return 'messages'
   }
@@ -211,6 +223,9 @@ function readRoute(): RouteKey {
 }
 
 function routePath(route: RouteKey): string {
+  if (route === 'groups') {
+    return '/groups'
+  }
   if (route === 'messages') {
     return '/messages'
   }

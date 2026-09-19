@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 
-export type RouteKey = 'users' | 'messages' | 'updates'
+export type RouteKey = 'users' | 'messages' | 'groups' | 'updates'
 export type UserStatus = 'pending' | 'active' | 'disabled'
 export type AdminRequest = <T>(
   path: string,
@@ -47,6 +47,50 @@ export interface MessageRow {
   contentType?: number
   sendTime?: number
   content?: unknown
+}
+
+export interface AdminGroup {
+  groupID: string
+  groupName?: string
+  faceURL?: string
+  ownerUserID?: string
+  creatorUserID?: string
+  memberCount?: number
+  createTime?: number
+  status?: number
+  groupType?: number
+  introduction?: string
+  notification?: string
+}
+
+export interface AdminGroupMember {
+  groupID?: string
+  userID: string
+  nickname?: string
+  faceURL?: string
+  roleLevel?: number
+  joinTime?: number
+  muteEndTime?: number
+  joinSource?: number
+  inviterUserID?: string
+}
+
+export interface GroupInfoResponse {
+  group: AdminGroup | null
+}
+
+export interface GroupListResponse {
+  groups: AdminGroup[]
+  total: number | null
+  page: number
+  count: number
+}
+
+export interface GroupMembersResponse {
+  members: AdminGroupMember[]
+  total: number | null
+  page: number
+  count: number
 }
 
 export interface AppUpdateInfo {

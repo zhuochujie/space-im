@@ -10,8 +10,31 @@ type NotificationUser = {
   nickname?: string;
 };
 
+type RevokeNotificationDetail = {
+  clientMsgID?: string;
+  revokeTime?: number;
+  revokerID?: string;
+  revokerNickname?: string;
+  sourceMessageSendID?: string;
+  sourceMessageSenderNickname?: string;
+};
+
 const userName = (user?: NotificationUser) =>
   user?.nickname || user?.userID || '用户';
+
+const parseNotificationDetail = (message: MessageItem) => {
+  const raw = message.notificationElem?.detail || message.content || '{}';
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+};
+
+const revokeMessageText = (detail: RevokeNotificationDetail) => {
+  const revoker = detail.revokerNickname || detail.revokerID;
+  return revoker ? `${revoker}撤回了一条消息` : '一条消息已撤回';
+};
 
 const muteDurationText = (seconds: number) => {
   if (seconds % 86400 === 0) {
@@ -27,15 +50,19 @@ const muteDurationText = (seconds: number) => {
 };
 
 export const isSystemNotificationMessage = (message: MessageItem) =>
-  message.notificationElem !== undefined;
+  message.notificationElem !== undefined ||
+  message.contentType === MessageType.RevokeMessage;
 
 const notificationText = (message: MessageItem) => {
   if (message.contentType === MessageType.FriendAdded) {
     return '我们已经成为好友';
   }
+  if (message.contentType === MessageType.RevokeMessage) {
+    return revokeMessageText(parseNotificationDetail(message));
+  }
 
   try {
-    const detail = JSON.parse(message.notificationElem?.detail || '{}');
+    const detail = parseNotificationDetail(message);
     switch (message.contentType) {
       case MessageType.GroupCreated:
         return `${userName(detail.opUser)}创建了群聊`;

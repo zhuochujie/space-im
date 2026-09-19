@@ -79,6 +79,14 @@ jest.mock('react-native-nitro-sound', () => ({
   },
 }));
 
+jest.mock('react-native-video', () => ({
+  VideoView: 'VideoView',
+  useEvent: jest.fn(),
+  useVideoPlayer: jest.fn(() => ({
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  })),
+}));
+
 jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => 'Icon');
 
 jest.mock('react-native-camera-kit', () => ({

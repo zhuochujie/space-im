@@ -16,6 +16,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 
 import { Avatar } from '../components/Avatar';
 import { KeyboardCenteredModal } from '../components/KeyboardCenteredModal';
+import { UserQrModal } from '../components/UserQrModal';
 import { getAppVersion } from '../native/SpaceAppUpdate';
 import { colors } from '../theme/colors';
 import {
@@ -53,6 +54,7 @@ export function ProfileScreen({
 }: Props) {
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(profile?.nickname || '');
   const [avatarDraftUri, setAvatarDraftUri] = useState(profile?.faceURL || '');
   const [avatarDraftPath, setAvatarDraftPath] = useState('');
@@ -62,7 +64,7 @@ export function ProfileScreen({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.1.5 (7)');
+  const [appVersion, setAppVersion] = useState('1.1.11 (13)');
 
   useEffect(() => {
     getAppVersion()
@@ -218,6 +220,29 @@ export function ProfileScreen({
         </Pressable>
       </View>
       <View style={styles.settingsCard}>
+        {phoneNumber ? (
+          <Pressable
+            onPress={() => setQrVisible(true)}
+            style={({ pressed }) => [
+              styles.settingRow,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <View style={styles.settingIcon}>
+              <MaterialCommunityIcons
+                color={colors.primary}
+                name="qrcode"
+                size={22}
+              />
+            </View>
+            <Text style={styles.settingLabel}>我的二维码</Text>
+            <MaterialCommunityIcons
+              color={colors.muted}
+              name="chevron-right"
+              size={22}
+            />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={() => setPasswordModalVisible(true)}
           style={({ pressed }) => [
@@ -273,6 +298,15 @@ export function ProfileScreen({
         <Text style={styles.logoutText}>退出登录</Text>
       </Pressable>
       <Text style={styles.appVersion}>SPACE IM {appVersion}</Text>
+      {phoneNumber ? (
+        <UserQrModal
+          faceURL={profile?.faceURL}
+          nickname={profile?.nickname || phoneNumber}
+          onClose={() => setQrVisible(false)}
+          phoneNumber={phoneNumber}
+          visible={qrVisible}
+        />
+      ) : null}
       <Modal
         animationType="fade"
         onRequestClose={closeProfileModal}

@@ -7,11 +7,11 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   PanResponder,
   Platform,
@@ -29,11 +29,13 @@ import OpenIMSDK, {
   type GroupMemberItem,
   type MessageItem,
   type PublicUserItem,
+  type RevokedInfo,
   GroupMemberFilter,
   GroupJoinSource,
   GroupMemberRole,
   GroupStatus,
   MessageStatus,
+  MessageType,
   OpenIMEvent,
   SessionType,
   ViewType,
@@ -47,6 +49,7 @@ import {
 } from 'react-native-image-picker';
 import { createThumbnail } from 'react-native-create-thumbnail';
 import type { createSound } from 'react-native-nitro-sound';
+import { VideoView, useEvent, useVideoPlayer } from 'react-native-video';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -74,7 +77,11 @@ import { requestRecordPermission, voiceDurationText } from '../utils/voice';
 
 const GROUP_MEMBER_PREVIEW_COUNT = 7;
 const GROUP_MEMBER_PAGE_SIZE = 50;
+const HISTORY_MESSAGE_PAGE_SIZE = 50;
 const MODAL_DISMISS_DELAY_MS = 280;
+const IMAGE_PREVIEW_MAX_WIDTH = 220;
+const IMAGE_PREVIEW_MAX_HEIGHT = 260;
+const ANDROID_KEYBOARD_ACCESSORY_GAP = 44;
 const MEMBER_MUTE_OPTIONS = [
   { label: '10 分钟', seconds: 10 * 60 },
   { label: '1 小时', seconds: 60 * 60 },
@@ -89,6 +96,181 @@ const waitForModalDismiss = () =>
   new Promise<void>(resolve => {
     setTimeout(() => resolve(), MODAL_DISMISS_DELAY_MS);
   });
+
+const imagePreviewSize = (width?: number, height?: number) => {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return { width: IMAGE_PREVIEW_MAX_WIDTH, height: 165 };
+  }
+
+  const scale = Math.min(
+    IMAGE_PREVIEW_MAX_WIDTH / width,
+    IMAGE_PREVIEW_MAX_HEIGHT / height,
+  );
+  return {
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  };
+};
+
+const videoTimeText = (seconds: number) => {
+  const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = Math.floor(safeSeconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+const parseRevokeSourceClientMsgID = (message: MessageItem) => {
+  if (message.contentType !== MessageType.RevokeMessage) {
+    return '';
+  }
+  const raw = message.notificationElem?.detail || message.content || '{}';
+  try {
+    const detail = JSON.parse(raw);
+    return typeof detail.clientMsgID === 'string' ? detail.clientMsgID : '';
+  } catch {
+    return '';
+  }
+};
+
+const sortMessages = (items: MessageItem[]) =>
+  [...items].sort((a, b) => {
+    if (a.sendTime !== b.sendTime) {
+      return a.sendTime - b.sendTime;
+    }
+    if (a.seq !== b.seq) {
+      return a.seq - b.seq;
+    }
+    return a.clientMsgID.localeCompare(b.clientMsgID);
+  });
+
+const mergeMessages = (
+  current: MessageItem[],
+  incoming: MessageItem[],
+) => {
+  const map = new Map<string, MessageItem>();
+
+  for (const item of [...current, ...incoming]) {
+    const revokedClientMsgID = parseRevokeSourceClientMsgID(item);
+    if (revokedClientMsgID) {
+      map.delete(`message:${revokedClientMsgID}`);
+      map.set(`revoke:${revokedClientMsgID}`, item);
+      continue;
+    }
+    if (map.has(`revoke:${item.clientMsgID}`)) {
+      continue;
+    }
+    map.set(`message:${item.clientMsgID}`, item);
+  }
+
+  return sortMessages([...map.values()]);
+};
+
+function InlineVideoPlayer({
+  onClose,
+  onLongPress,
+  uri,
+}: {
+  onClose: () => void;
+  onLongPress: () => void;
+  uri: string;
+}) {
+  const player = useVideoPlayer(uri, instance => instance.play());
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [progressWidth, setProgressWidth] = useState(0);
+
+  useEvent(player, 'onLoad', data => {
+    setDuration(data.duration);
+    setCurrentTime(data.currentTime);
+  });
+  useEvent(player, 'onProgress', data => setCurrentTime(data.currentTime));
+  useEvent(player, 'onPlaybackStateChange', data => {
+    setIsPlaying(data.isPlaying);
+    setIsBuffering(data.isBuffering);
+  });
+  useEvent(player, 'onEnd', () => {
+    setIsPlaying(false);
+    setCurrentTime(duration);
+  });
+  useEvent(player, 'onError', () => showToast('视频播放失败'));
+
+  const togglePlayback = () => {
+    if (isPlaying) {
+      player.pause();
+      return;
+    }
+    if (duration > 0 && currentTime >= duration - 0.2) {
+      player.seekTo(0);
+      setCurrentTime(0);
+    }
+    player.play();
+  };
+
+  const seekVideo = (locationX: number) => {
+    if (!progressWidth || !duration) {
+      return;
+    }
+    const nextTime =
+      Math.max(0, Math.min(progressWidth, locationX)) / progressWidth * duration;
+    player.seekTo(nextTime);
+    setCurrentTime(nextTime);
+  };
+
+  const progress = duration > 0 ? Math.min(1, currentTime / duration) : 0;
+
+  return (
+    <Pressable onLongPress={onLongPress} style={styles.customVideoPlayer}>
+      <VideoView
+        player={player}
+        resizeMode="contain"
+        style={styles.previewImage}
+      />
+      {isBuffering ? (
+        <ActivityIndicator
+          color="#FFFFFF"
+          size="large"
+          style={styles.videoLoading}
+        />
+      ) : null}
+      <Pressable
+        hitSlop={12}
+        onPress={onClose}
+        style={styles.videoCloseButton}
+      >
+        <MaterialCommunityIcons color="#FFFFFF" name="close" size={26} />
+      </Pressable>
+      <View style={styles.videoControls}>
+        <Pressable
+          hitSlop={10}
+          onPress={togglePlayback}
+          style={styles.videoControlButton}
+        >
+          <MaterialCommunityIcons
+            color="#FFFFFF"
+            name={isPlaying ? 'pause' : 'play'}
+            size={26}
+          />
+        </Pressable>
+        <Text style={styles.videoTime}>{videoTimeText(currentTime)}</Text>
+        <Pressable
+          onLayout={event => setProgressWidth(event.nativeEvent.layout.width)}
+          onPress={event => seekVideo(event.nativeEvent.locationX)}
+          style={styles.videoProgressTrack}
+        >
+          <View
+            style={[styles.videoProgressFill, { width: `${progress * 100}%` }]}
+          />
+          <View
+            style={[styles.videoProgressThumb, { left: `${progress * 100}%` }]}
+          />
+        </Pressable>
+        <Text style={styles.videoTime}>{videoTimeText(duration)}</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 type SoundInstance = ReturnType<typeof createSound>;
 type RecordBackEvent = Parameters<
@@ -132,15 +314,14 @@ export function ChatScreen({
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyEnd, setHistoryEnd] = useState(false);
   const [sending, setSending] = useState(false);
   const [messageProgress, setMessageProgress] = useState<
     Record<string, number>
   >({});
   const [previewImage, setPreviewImage] = useState('');
-  const [previewVideo, setPreviewVideo] = useState<{
-    thumbnail?: string;
-    uri: string;
-  }>();
+  const [previewVideo, setPreviewVideo] = useState<{ uri: string }>();
   const [pendingSaveMedia, setPendingSaveMedia] = useState<PendingSaveMedia>();
   const [savingPreviewMedia, setSavingPreviewMedia] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -193,6 +374,7 @@ export function ChatScreen({
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [cancelVoiceBySlide, setCancelVoiceBySlide] = useState(false);
   const [playingSoundID, setPlayingSoundID] = useState('');
   const recordingPath = useRef('');
@@ -200,6 +382,8 @@ export function ChatScreen({
   const latestRecordMs = useRef(0);
   const cancelVoiceBySlideRef = useRef(false);
   const soundRef = useRef<SoundInstance | null>(null);
+  const conversationIDRef = useRef(target.conversationID);
+  const historyLoadingRef = useRef(false);
   const isGroupChat = target.sessionType === SessionType.Group;
   const isGroupActive =
     !isGroupChat || (Boolean(group) && !target.isNotInGroup);
@@ -263,13 +447,12 @@ export function ChatScreen({
   );
   const previewGroupMembers = groupMembers.slice(0, GROUP_MEMBER_PREVIEW_COUNT);
 
+  useEffect(() => {
+    conversationIDRef.current = target.conversationID;
+  }, [target.conversationID]);
+
   const appendMessages = useCallback((incoming: MessageItem[]) => {
-    setMessages(current => {
-      const map = new Map(
-        [...current, ...incoming].map(item => [item.clientMsgID, item]),
-      );
-      return [...map.values()].sort((a, b) => a.sendTime - b.sendTime);
-    });
+    setMessages(current => mergeMessages(current, incoming));
   }, []);
 
   const updateMessage = useCallback(
@@ -283,9 +466,79 @@ export function ChatScreen({
     [],
   );
 
+  const createLocalRevokeMessage = useCallback(
+    (source: MessageItem, revokedInfo?: Partial<RevokedInfo>) => {
+      const revokeTime = revokedInfo?.revokeTime || Date.now();
+      const detail = {
+        clientMsgID: source.clientMsgID,
+        revokeTime,
+        revokerID: revokedInfo?.revokerID || selfUserID,
+        revokerNickname: revokedInfo?.revokerNickname || '你',
+        revokerRole: revokedInfo?.revokerRole || 0,
+        seq: revokedInfo?.seq || source.seq,
+        sessionType: source.sessionType,
+        sourceMessageSendID: source.sendID,
+        sourceMessageSendTime: source.sendTime,
+        sourceMessageSenderNickname:
+          source.senderNickname || revokedInfo?.sourceMessageSenderNickname,
+      };
+      const detailText = JSON.stringify(detail);
+
+      return {
+        ...source,
+        clientMsgID: `revoke_${source.clientMsgID}`,
+        serverMsgID: '',
+        createTime: revokeTime,
+        sendTime: revokeTime,
+        sendID: detail.revokerID,
+        contentType: MessageType.RevokeMessage,
+        content: detailText,
+        status: MessageStatus.Succeed,
+        textElem: undefined,
+        cardElem: undefined,
+        pictureElem: undefined,
+        soundElem: undefined,
+        videoElem: undefined,
+        fileElem: undefined,
+        mergeElem: undefined,
+        atTextElem: undefined,
+        faceElem: undefined,
+        locationElem: undefined,
+        customElem: undefined,
+        quoteElem: undefined,
+        notificationElem: { detail: detailText },
+        advancedTextElem: undefined,
+        typingElem: undefined,
+      };
+    },
+    [selfUserID],
+  );
+
+  const replaceMessageWithRevokeNotice = useCallback(
+    (revokedInfo: RevokedInfo) => {
+      setMessages(current => {
+        const source = current.find(
+          item => item.clientMsgID === revokedInfo.clientMsgID,
+        );
+        if (!source) {
+          return current.filter(
+            item => item.clientMsgID !== revokedInfo.clientMsgID,
+          );
+        }
+        return mergeMessages(current, [
+          createLocalRevokeMessage(source, revokedInfo),
+        ]);
+      });
+    },
+    [createLocalRevokeMessage],
+  );
+
   useEffect(() => {
     let active = true;
     setLoading(true);
+    historyLoadingRef.current = false;
+    setHistoryLoading(false);
+    setHistoryEnd(false);
     setMessages([]);
     const receive = (incoming: MessageItem[]) => {
       const relevant = incoming.filter(message =>
@@ -315,19 +568,26 @@ export function ChatScreen({
         [message.clientMsgID]: progress,
       }));
     };
+    const revokeMessageFromList = (revokedInfo: RevokedInfo) =>
+      replaceMessageWithRevokeNotice(revokedInfo);
 
     OpenIMSDK.on(OpenIMEvent.OnRecvNewMessages, receive);
     OpenIMSDK.on(OpenIMEvent.OnRecvNewMessage, receiveOne);
     OpenIMSDK.on(OpenIMEvent.SendMessageProgress, updateProgress);
+    OpenIMSDK.on(OpenIMEvent.OnNewRecvMessageRevoked, revokeMessageFromList);
     OpenIMSDK.getAdvancedHistoryMessageList({
       conversationID: target.conversationID,
       startClientMsgID: '',
-      count: 50,
+      count: HISTORY_MESSAGE_PAGE_SIZE,
       viewType: ViewType.History,
     })
       .then(result => {
         if (active) {
           appendMessages(result.messageList);
+          setHistoryEnd(
+            result.isEnd ||
+              result.messageList.length < HISTORY_MESSAGE_PAGE_SIZE,
+          );
         }
       })
       .catch(() => showToast('消息加载失败'))
@@ -346,15 +606,94 @@ export function ChatScreen({
       OpenIMSDK.off(OpenIMEvent.OnRecvNewMessages, receive);
       OpenIMSDK.off(OpenIMEvent.OnRecvNewMessage, receiveOne);
       OpenIMSDK.off(OpenIMEvent.SendMessageProgress, updateProgress);
+      OpenIMSDK.off(OpenIMEvent.OnNewRecvMessageRevoked, revokeMessageFromList);
     };
   }, [
     appendMessages,
+    replaceMessageWithRevokeNotice,
     selfUserID,
     target.conversationID,
     target.groupID,
     target.sessionType,
     target.userID,
   ]);
+
+  const loadEarlierMessages = async () => {
+    if (
+      loading ||
+      historyLoading ||
+      historyLoadingRef.current ||
+      historyEnd ||
+      messages.length === 0
+    ) {
+      return;
+    }
+    const oldestMessage = messages[0];
+    const conversationID = target.conversationID;
+    historyLoadingRef.current = true;
+    setHistoryLoading(true);
+    try {
+      const result = await OpenIMSDK.getAdvancedHistoryMessageList({
+        conversationID,
+        startClientMsgID: oldestMessage.clientMsgID,
+        count: HISTORY_MESSAGE_PAGE_SIZE,
+        viewType: ViewType.History,
+      });
+      if (conversationIDRef.current !== conversationID) {
+        return;
+      }
+      appendMessages(result.messageList);
+      setHistoryEnd(
+        result.isEnd || result.messageList.length < HISTORY_MESSAGE_PAGE_SIZE,
+      );
+    } catch {
+      showToast('更早消息加载失败');
+    } finally {
+      historyLoadingRef.current = false;
+      setHistoryLoading(false);
+    }
+  };
+
+  const revokeOwnMessage = async (item: MessageItem) => {
+    if (item.sendID !== selfUserID || item.status !== MessageStatus.Succeed) {
+      return;
+    }
+    const confirmed = await showConfirm({
+      title: '撤回消息',
+      message: '确定撤回这条消息吗？',
+      confirmText: '撤回',
+      destructive: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await OpenIMSDK.revokeMessage({
+        conversationID: target.conversationID,
+        clientMsgID: item.clientMsgID,
+      });
+      appendMessages([createLocalRevokeMessage(item)]);
+      showToast('已撤回');
+    } catch {
+      showToast('撤回失败');
+    }
+  };
+
+  const handleTextMessageLongPress = (item: MessageItem) => {
+    if (item.sendID === selfUserID && item.status === MessageStatus.Succeed) {
+      Alert.alert('消息操作', '选择要执行的操作', [
+        { text: '复制', onPress: () => copyMessageText(item) },
+        {
+          text: '撤回',
+          style: 'destructive',
+          onPress: () => revokeOwnMessage(item),
+        },
+        { text: '取消', style: 'cancel' },
+      ]);
+      return;
+    }
+    copyMessageText(item);
+  };
 
   useEffect(() => {
     setRemark(friend?.remark || '');
@@ -371,6 +710,28 @@ export function ChatScreen({
       sound.stopPlayer().catch(() => undefined);
       sound.removePlayBackListener();
       sound.removePlaybackEndListener();
+    };
+  }, []);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      event => {
+        Keyboard.scheduleLayoutAnimation(event);
+        setKeyboardVisible(true);
+      },
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      event => {
+        Keyboard.scheduleLayoutAnimation(event);
+        setKeyboardVisible(false);
+      },
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
     };
   }, []);
 
@@ -858,13 +1219,13 @@ export function ChatScreen({
     }
   };
 
-  const openVideo = (item: MessageItem, thumbnail?: string) => {
+  const openVideo = (item: MessageItem) => {
     const uri = mediaUri(item.videoElem?.videoUrl || item.videoElem?.videoPath);
     if (!uri) {
       showToast('无法播放');
       return;
     }
-    setPreviewVideo({ thumbnail, uri });
+    setPreviewVideo({ uri });
   };
 
   const confirmSaveMedia = async (
@@ -1674,7 +2035,7 @@ export function ChatScreen({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.page}
     >
       <View style={styles.header}>
@@ -1711,11 +2072,20 @@ export function ChatScreen({
           inverted
           keyExtractor={item => item.clientMsgID}
           key={target.conversationID}
+          ListFooterComponent={
+            historyLoading ? (
+              <View style={styles.historyLoading}>
+                <ActivityIndicator color={colors.primary} size="small" />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.emptyMessageList}>
               <EmptyState subtitle="发送第一条消息吧" title="开始聊天" />
             </View>
           }
+          onEndReached={loadEarlierMessages}
+          onEndReachedThreshold={0.18}
           renderItem={({ item }) => {
             if (isSystemNotificationMessage(item)) {
               return (
@@ -1737,8 +2107,20 @@ export function ChatScreen({
                 item.pictureElem?.snapshotPicture?.url ||
                 item.pictureElem?.sourcePath,
             );
+            const imageInfo =
+              item.pictureElem?.bigPicture ||
+              item.pictureElem?.sourcePicture ||
+              item.pictureElem?.snapshotPicture;
+            const imageSize = imagePreviewSize(
+              imageInfo?.width,
+              imageInfo?.height,
+            );
             const videoThumbnail = mediaUri(
               item.videoElem?.snapshotUrl || item.videoElem?.snapshotPath,
+            );
+            const videoPreviewSize = imagePreviewSize(
+              item.videoElem?.snapshotWidth,
+              item.videoElem?.snapshotHeight,
             );
             const hasMedia = Boolean(item.pictureElem || item.videoElem);
             const hasSound = Boolean(item.soundElem);
@@ -1785,22 +2167,26 @@ export function ChatScreen({
                     ]}
                   >
                     {item.pictureElem && imageSource ? (
-                      <Pressable onPress={() => setPreviewImage(imageSource)}>
+                      <Pressable
+                        onLongPress={() => revokeOwnMessage(item)}
+                        onPress={() => setPreviewImage(imageSource)}
+                      >
                         <CachedImage
-                          resizeMode="cover"
-                          style={styles.mediaImage}
+                          resizeMode="contain"
+                          style={[styles.mediaImage, imageSize]}
                           uri={imageSource}
                         />
                       </Pressable>
                     ) : item.videoElem ? (
                       <Pressable
-                        onPress={() => openVideo(item, videoThumbnail)}
-                        style={styles.videoPreview}
+                        onLongPress={() => revokeOwnMessage(item)}
+                        onPress={() => openVideo(item)}
+                        style={[styles.videoPreview, videoPreviewSize]}
                       >
                         {videoThumbnail ? (
                           <CachedImage
-                            resizeMode="cover"
-                            style={styles.mediaImage}
+                            resizeMode="contain"
+                            style={[styles.mediaImage, videoPreviewSize]}
                             uri={videoThumbnail}
                           />
                         ) : (
@@ -1817,6 +2203,7 @@ export function ChatScreen({
                       </Pressable>
                     ) : item.soundElem ? (
                       <Pressable
+                        onLongPress={() => revokeOwnMessage(item)}
                         onPress={() => playSound(item)}
                         style={styles.soundContent}
                       >
@@ -1839,7 +2226,9 @@ export function ChatScreen({
                         </Text>
                       </Pressable>
                     ) : (
-                      <Pressable onLongPress={() => copyMessageText(item)}>
+                      <Pressable
+                        onLongPress={() => handleTextMessageLongPress(item)}
+                      >
                         <Text
                           style={[
                             styles.messageText,
@@ -1886,7 +2275,12 @@ export function ChatScreen({
       <View
         style={[
           styles.composer,
-          { paddingBottom: Math.max(insets.bottom, 10) },
+          {
+            paddingBottom:
+              Platform.OS === 'android' && keyboardVisible
+                ? ANDROID_KEYBOARD_ACCESSORY_GAP
+                : Math.max(insets.bottom, 10),
+          },
         ]}
       >
         {voiceMode ? (
@@ -2077,45 +2471,13 @@ export function ChatScreen({
       >
         <Pressable onPress={closePreviewVideo} style={styles.previewBackdrop}>
           {previewVideo ? (
-            <Pressable
+            <InlineVideoPlayer
+              onClose={closePreviewVideo}
               onLongPress={() =>
                 confirmSaveMedia(previewVideo.uri, 'video', 'mp4')
               }
-              onPress={closePreviewVideo}
-              style={styles.previewMediaTouchable}
-            >
-              {previewVideo.thumbnail ? (
-                <CachedImage
-                  resizeMode="contain"
-                  style={styles.previewImage}
-                  uri={previewVideo.thumbnail}
-                />
-              ) : (
-                <View style={styles.previewVideoPlaceholder}>
-                  <MaterialCommunityIcons
-                    color="#FFFFFF"
-                    name="video-outline"
-                    size={54}
-                  />
-                </View>
-              )}
-              <Pressable
-                hitSlop={12}
-                onPress={() =>
-                  Linking.openURL(previewVideo.uri).catch(() =>
-                    showToast('无法播放'),
-                  )
-                }
-                style={styles.previewPlayButton}
-              >
-                <MaterialCommunityIcons
-                  color="#FFFFFF"
-                  name="play"
-                  size={38}
-                  style={styles.playIcon}
-                />
-              </Pressable>
-            </Pressable>
+              uri={previewVideo.uri}
+            />
           ) : null}
           {pendingSaveMedia?.type === 'video' ? (
             <Pressable style={styles.previewSaveSheet}>
@@ -3057,6 +3419,10 @@ const styles = StyleSheet.create({
   headerPlaceholder: { width: 42 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   messageList: { padding: 16, flexGrow: 1 },
+  historyLoading: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
   emptyMessageList: {
     flex: 1,
     transform: [{ scaleY: -1 }],
@@ -3118,7 +3484,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     paddingVertical: 0,
     overflow: 'hidden',
-    backgroundColor: '#DDE3EC',
+    backgroundColor: 'transparent',
   },
   soundBubble: {
     minWidth: 128,
@@ -3139,13 +3505,13 @@ const styles = StyleSheet.create({
   mediaImage: {
     width: 220,
     height: 165,
-    backgroundColor: '#DDE3EC',
   },
   videoPreview: {
     width: 220,
     height: 165,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#DDE3EC',
   },
   videoPlaceholder: {
     ...StyleSheet.absoluteFill,
@@ -3312,20 +3678,71 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  previewVideoPlaceholder: {
+  customVideoPlayer: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#000000',
+  },
+  videoLoading: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: '48%',
+  },
+  videoCloseButton: {
+    position: 'absolute',
+    top: 48,
+    right: 18,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewPlayButton: {
+  videoControls: {
     position: 'absolute',
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    left: 14,
+    right: 14,
+    bottom: 30,
+    height: 52,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  videoControlButton: {
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  videoTime: {
+    minWidth: 38,
+    color: '#FFFFFF',
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  videoProgressTrack: {
+    flex: 1,
+    height: 24,
+    justifyContent: 'center',
+  },
+  videoProgressFill: {
+    position: 'absolute',
+    left: 0,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primary,
+  },
+  videoProgressThumb: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    marginLeft: -5,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
   },
   previewSaveSheet: {
     position: 'absolute',

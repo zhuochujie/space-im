@@ -101,3 +101,76 @@ export class SearchMessagesDto {
   @Max(100, { message: 'count 不能超过 100' })
   count = 50;
 }
+
+export class ListAdminGroupsDto {
+  @Transform(({ value }: { value: unknown }) => trim(value))
+  @IsOptional()
+  @IsString({ message: 'userID 必须是字符串' })
+  userID?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'page 必须是整数' })
+  @Min(1, { message: 'page 必须大于 0' })
+  page = 1;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'count 必须是整数' })
+  @Min(1, { message: 'count 必须大于 0' })
+  @Max(100, { message: 'count 不能超过 100' })
+  count = 50;
+}
+
+export class GetGroupMembersDto {
+  @Transform(({ value }: { value: unknown }) => trim(value))
+  @IsOptional()
+  @IsString({ message: 'keyword 必须是字符串' })
+  keyword?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'filter 必须是整数' })
+  @Min(0, { message: 'filter 不能小于 0' })
+  @Max(5, { message: 'filter 不能大于 5' })
+  filter = 0;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'page 必须是整数' })
+  @Min(1, { message: 'page 必须大于 0' })
+  page = 1;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'count 必须是整数' })
+  @Min(1, { message: 'count 必须大于 0' })
+  @Max(100, { message: 'count 不能超过 100' })
+  count = 50;
+}
+
+export class SearchGroupMessagesDto {
+  @Transform(({ value }: { value: unknown }) => trim(value))
+  @IsOptional()
+  @IsString({ message: 'sendID 必须是字符串' })
+  sendID?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'contentType 必须是整数' })
+  @Min(0, { message: 'contentType 不能小于 0' })
+  contentType?: number;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'page 必须是整数' })
+  @Min(1, { message: 'page 必须大于 0' })
+  page = 1;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt({ message: 'count 必须是整数' })
+  @Min(1, { message: 'count 必须大于 0' })
+  @Max(100, { message: 'count 不能超过 100' })
+  count = 50;
+}

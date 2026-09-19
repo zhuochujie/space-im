@@ -35,6 +35,16 @@ export function Sidebar({ route, onNavigate }: SidebarProps) {
           消息管理
         </RouteLink>
         <RouteLink
+          active={route === 'groups'}
+          href="/groups"
+          onClick={(event) => {
+            event.preventDefault()
+            onNavigate('groups')
+          }}
+        >
+          群管理
+        </RouteLink>
+        <RouteLink
           active={route === 'updates'}
           href="/updates"
           onClick={(event) => {
